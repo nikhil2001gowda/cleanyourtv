@@ -1,19 +1,26 @@
 {
   "dock_apps": [
+    "com.apple.atve.amazon.appletv",
+    "com.apple.atve.androidtv.appletv",
     "com.netflix.ninja",
-    "com.google.android.youtube.tv",
     "com.amazon.amazonvideo.livingroom",
-    "com.disney.disneyplus",
-    "com.wbd.stream",
-    "com.apple.atve.androidtv.appletv"
+    "com.google.android.youtube.tv",
+    "in.startv.hotstar",
+    "org.videolan.vlc"
   ],
+  "columns": 6,
   "background_color": "#090C14",
   "wallpaper": true,
   "cinematic_home": true,
+  "cinematic_art": 65,
+  "cinematic_scrim": 75,
   "dock_glass": true,
+  "dock_even_padding": true,
   "icon_only_buttons": true,
   "app_glow": true,
   "glow_style": "horizon",
   "focus_overshoot": false,
-  "advanced_effects": true
+  "advanced_effects": true,
+  "fade_rows": true,
+  "rows_below_dock": 0
 }

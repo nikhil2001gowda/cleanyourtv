@@ -1875,7 +1875,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         float w = card.getWidth() * scale + 2 * pad;
         float h = card.getHeight() * scale + 2 * pad;
         float x = r.exactCenterX() - w / 2f;
-        float y = r.exactCenterY() - h / 2f - (advancedEffects ? 4f * density : 0f);
+        float y = r.exactCenterY() - h / 2f;
 
         ViewGroup.LayoutParams lp = glass.getLayoutParams();
         if (lp.width != (int) w || lp.height != (int) h || card.getWidth() != glassCardW) {
@@ -1958,8 +1958,15 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private void showHero(int position, float dockTopInRoot) {
         String label = adapter.labelAt(position);
         int color = adapter.ambientColorAt(position);
-        float y = dockTopInRoot - 14 * density - 26 * density - hero.getHeight();
         boolean changed = !label.contentEquals(heroName.getText());
+        fillHero(position, label);
+        int heroH = hero.getHeight();
+        if (heroH <= 0) {
+            hero.measure(View.MeasureSpec.makeMeasureSpec(root.getWidth(), View.MeasureSpec.AT_MOST),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            heroH = hero.getMeasuredHeight();
+        }
+        float y = dockTopInRoot - 14 * density - 26 * density - heroH;
         if (cinematic && heroArtAlpha > 0f) showHeroArt(position);
 
         if (!animations || reducedMotion) {
@@ -1967,7 +1974,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             // full-screen panel, and this switch exists for the GPUs that cannot afford it.
             hero.animate().cancel();
             ambient.animate().cancel();
-            fillHero(position, label);
             hero.setY(y);
             hero.setTranslationX(0f);
             hero.setAlpha(1f);
@@ -1983,7 +1989,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             stopAmbientAnimation();
             hero.animate().cancel();
             ambient.animate().cancel();
-            fillHero(position, label);
             hero.setY(y);
             hero.setTranslationX(0f);
             hero.animate().alpha(1f).setDuration(260).start();
@@ -1996,7 +2001,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (advancedEffects) hero.animate().cancel();
             hero.animate().alpha(0f).translationX(-12 * density).setDuration(120).withEndAction(() -> {
                 fillHero(position, label);
-                hero.setY(y);
+                int h = hero.getHeight() > 0 ? hero.getHeight() : hero.getMeasuredHeight();
+                float updatedY = dockTopInRoot - 14 * density - 26 * density - h;
+                hero.setY(updatedY);
                 hero.setTranslationX(12 * density);
                 hero.animate().alpha(1f).translationX(0f).setDuration(200).start();
             }).start();

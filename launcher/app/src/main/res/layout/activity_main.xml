@@ -110,6 +110,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="68dp"
         android:orientation="vertical"
+        android:elevation="6dp"
         android:alpha="0">
 
         <TextView
