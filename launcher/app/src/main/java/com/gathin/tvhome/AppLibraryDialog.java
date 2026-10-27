@@ -527,6 +527,14 @@ final class AppLibraryDialog {
         boolean home = onHome.test(pkg);
         addAction(rows, home ? R.string.library_remove_shortcut : R.string.library_add_home,
                 () -> changeHome(app, !home));
+        if (SystemSettings.canUninstall(activity, pkg)) {
+            addAction(rows, R.string.tile_uninstall, () -> {
+                close();
+                if (!SystemSettings.uninstall(activity, pkg)) {
+                    Toast.makeText(activity, activity.getString(R.string.cant_open, label(app)), Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
         Intent info = SystemSettings.appInfo(activity, pkg);
         if (info != null) addAction(rows, R.string.library_app_info, () -> {
             close();

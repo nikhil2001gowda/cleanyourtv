@@ -1,8 +1,10 @@
 package com.gathin.tvhome;
 
+import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
@@ -48,5 +50,51 @@ final class SystemSettings {
     static Intent appInfo(Context context, String pkg) {
         Intent info = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + pkg));
         return context.getPackageManager().resolveActivity(info, PackageManager.MATCH_DEFAULT_ONLY) != null ? info : null;
+    }
+
+    /** True when pkg is installed and not a non-updated system app. */
+    static boolean canUninstall(Context context, String pkg) {
+        if (pkg == null || pkg.equals(context.getPackageName())) return false;
+        try {
+            ApplicationInfo ai = context.getPackageManager().getApplicationInfo(pkg, 0);
+            return (ai.flags & ApplicationInfo.FLAG_SYSTEM) == 0
+                    || (ai.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0;
+        } catch (PackageManager.NameNotFoundException e) {
+            return false;
+        }
+    }
+
+    /** Prompts to uninstall pkg using ACTION_DELETE, ACTION_UNINSTALL_PACKAGE, or App info fallback. */
+    static boolean uninstall(Context context, String pkg) {
+        if (pkg == null) return false;
+        Uri uri = Uri.parse("package:" + pkg);
+
+        // 1. Primary: ACTION_DELETE with package URI (standard on Android 8+)
+        Intent delete = new Intent(Intent.ACTION_DELETE, uri);
+        delete.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            context.startActivity(delete);
+            return true;
+        } catch (ActivityNotFoundException | SecurityException ignored) {}
+
+        // 2. Fallback: ACTION_UNINSTALL_PACKAGE
+        Intent uninstallPkg = new Intent(Intent.ACTION_UNINSTALL_PACKAGE, uri);
+        uninstallPkg.putExtra(Intent.EXTRA_RETURN_RESULT, true);
+        uninstallPkg.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            context.startActivity(uninstallPkg);
+            return true;
+        } catch (ActivityNotFoundException | SecurityException ignored) {}
+
+        // 3. Fallback for restricted/OEM TVs: open App info where user can manage/uninstall
+        Intent info = appInfo(context, pkg);
+        if (info != null) {
+            info.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                context.startActivity(info);
+                return true;
+            } catch (ActivityNotFoundException | SecurityException ignored) {}
+        }
+        return false;
     }
 }

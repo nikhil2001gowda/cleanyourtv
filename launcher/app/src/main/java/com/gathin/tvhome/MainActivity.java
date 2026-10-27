@@ -3818,18 +3818,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (LibraryApps.save(this, pkg, false)) reloadApps(false);
             else Toast.makeText(this, R.string.library_save_failed, Toast.LENGTH_LONG).show();
         });
-        boolean isSystem = false;
-        try {
-            ApplicationInfo ai = getPackageManager().getApplicationInfo(pkg, 0);
-            isSystem = (ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
-        } catch (PackageManager.NameNotFoundException ignored) {}
-        if (!isSystem) {
+        if (SystemSettings.canUninstall(this, pkg)) {
             addSettingsMenuRow(rows, popup, R.string.tile_uninstall, () -> {
-                Intent uninstall = new Intent(Intent.ACTION_DELETE, Uri.parse("package:" + pkg));
-                uninstall.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                try {
-                    startActivity(uninstall);
-                } catch (ActivityNotFoundException | SecurityException e) {
+                if (!SystemSettings.uninstall(this, pkg)) {
                     Toast.makeText(this, getString(R.string.cant_open, adapter.labelAt(position)), Toast.LENGTH_SHORT).show();
                 }
             });
