@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CleanMyTV Companion</string>
+    <string name="service_label">CleanMyTV Companion Service</string>
+    <string name="repo_url">https://github.com/Gathin23/cleanyourtv</string>
+
+    <!--
+        Shown by Android in Settings → Accessibility next to the toggle
+        for our service.
+    -->
+    <string name="accessibility_description">
+        Optimizes RAM, clears cache, and handles Fire TV Home button actions for CleanMyTV.
+    </string>
+
+    <!-- Target row -->
+    <string name="target_picker_tip">Active launcher. Long-press opens system info page.</string>
+    <string name="target_none">Choose target app…</string>
+    <string name="target_not_installed_suffix"> - not installed</string>
+    <string name="target_picker_emoji">📂</string>
+    <string name="target_picker_emoji_desc">Choose target app</string>
+    <string name="launch_button_glyph">▶</string>
+    <string name="launch_button_desc">Launch CleanMyTV</string>
+    <string name="launch_button_tip">Launch CleanMyTV now.</string>
+
+    <!-- Quick action buttons -->
+    <string name="action_clear_cache">⚡ Optimize RAM</string>
+    <string name="action_clear_cache_tip">Immediately clears cache directories, trims memory, and forces garbage collection.</string>
+    <string name="action_amazon_home">🏠 Amazon Home</string>
+    <string name="action_amazon_home_tip">Switch to the Amazon Fire TV launcher immediately.</string>
+    <string name="action_cleanmytv_home">🚀 CleanMyTV</string>
+    <string name="action_cleanmytv_home_tip">Open the CleanMyTV launcher now.</string>
+    <string name="action_settings">⚙️ Settings</string>
+    <string name="action_settings_tip">Open Fire TV system settings directly without Amazon ad pages.</string>
+
+    <!-- Switches -->
+    <string name="switch_accessibility">Accessibility service (active)</string>
+    <string name="switch_accessibility_tip">Required for Home button control and RAM optimization. Granted via ADB.</string>
+    <string name="switch_hijack">Home button controller</string>
+    <string name="switch_hijack_tip">Pressing ⌂ Home opens CleanMyTV.\n• Single-click on CleanMyTV clears cache &amp; frees memory\n• Triple-click Home returns to Amazon Home\n• Long-press Home opens Fire TV Quick Menu</string>
+    <string name="switch_hijack_tip_fos7">Pressing ⌂ Home opens CleanMyTV.\n• Single-click on CleanMyTV clears cache &amp; frees memory\n• Triple-click Home returns to Amazon Home\n• Long-press Home opens Fire TV Quick Menu</string>
+    <!-- Fire OS 7 only: what covers Amazon home during the ~5 s Home delay
+         (shown on the right of the Replace Home row). -->
+    <string name="mask_cover_label">Loading screen:</string>
+    <string name="mask_cover_animation">Animation</string>
+    <string name="mask_cover_black">Black screen</string>
+    <string name="mask_cover_tip">Displays the authentic Fire TV boot loading animation during the Fire OS handoff. Hold ◉ OK to preview.</string>
+
+    <!-- Escape gestures, shown as a sub-row under Replace Home. -->
+    <string name="escape_label">Amazon Home Gesture:</string>
+    <string name="escape_long_label">Quick Menu (Hold)</string>
+    <string name="escape_double_label">Triple-click</string>
+    <string name="escape_long_box_tip">Long-press ⌂ Home opens the Fire TV Quick Menu with Profiles, Sleep, Mirroring, and Settings.</string>
+    <string name="escape_double_box_tip">Triple-click ⌂ Home on CleanMyTV returns directly to the Amazon launcher home screen.</string>
+
+    <string name="switch_boot">Launch on boot</string>
+    <string name="switch_boot_tip">Open the target app automatically when the device boots or wakes from standby.</string>
+    <string name="switch_menu_lp">☰ Menu long-press opens this config screen</string>
+    <string name="switch_menu_lp_tip">Hold the ☰ Menu button for half a second to open this config screen.</string>
+    <!-- Instant launcher shortcuts: reach the target without going through the
+         Home button, so on Fire OS 7 they skip the app-switch delay. -->
+    <string name="launch_key_label">Map custom buttons</string>
+    <string name="launch_key_launcher_label">Launcher:</string>
+    <string name="launch_key_amazon_label">Amazon home:</string>
+    <string name="launch_key_tip">Map spare remote buttons: one for your target launcher, one for the Amazon home screen, Custom for any number of further apps. Buttons with their own key code (● ● ● ●, numbers, channel, subtitles, teletext, ⏪ ⏵ ⏩) switch instantly. Buttons that open an app (⊞ Apps, 📺 Live TV, Netflix) can only be redirected, which is slightly slower and may flash briefly.</string>
+    <string name="launch_key_tip_fos7">Map spare remote buttons: one for your target launcher, one for the Amazon home screen, Custom for any number of further apps. Buttons with their own key code (● ● ● ●, numbers, channel, subtitles, teletext, ⏪ ⏵ ⏩) switch instantly, unlike ⌂ Home which Fire OS 7 holds for up to 5 seconds. Buttons that open an app (⊞ Apps, 📺 Live TV, Netflix) can only be redirected, which is slightly slower and may flash briefly.</string>
+    <string name="launch_key_launcher_box_tip">Press ◉ OK to bind a remote button that opens your target launcher directly (↩ Back cancels); hold ◉ OK to reset.</string>
+    <string name="launch_key_amazon_box_tip">Press ◉ OK to bind a remote button that jumps to the Amazon home screen (↩ Back cancels); hold ◉ OK to reset.</string>
+    <string name="launch_key_none">None</string>
+    <string name="launch_key_learning">Press a button…</string>
+    <string name="launch_key_cleared">Button mapping reset</string>
+    <!-- Plain slot names, used when a binding collides with one that already exists. -->
+    <string name="launch_key_launcher_name">Launcher</string>
+    <string name="launch_key_amazon_name">Amazon home</string>
+    <string name="map_button_in_use">That button is already mapped to %1$s.</string>
+    <string name="map_button_is_same_app">That button already opens this app.</string>
+
+    <!-- Custom mappings: any button opens any installed app, edited in their own dialog. -->
+    <string name="launch_key_custom_label">Custom:</string>
+    <string name="launch_key_custom_box_tip">Opens a dialog where further buttons can be mapped, each one to an app of your choice.</string>
+    <string name="custom_maps_add">+</string>
+    <!-- Appended to the icons in the Custom box when more mappings exist than fit. -->
+    <string name="custom_maps_more">…</string>
+    <string name="custom_maps_title">Custom button mappings</string>
+    <string name="custom_maps_pick_title">Open which app?</string>
+    <string name="custom_maps_pick_app">Choose an app…</string>
+    <string name="custom_maps_row_cleared">App cleared</string>
+    <string name="custom_maps_hint">Press ◉ OK on a field to set it, hold ◉ OK to clear it. Choose the app first, then the button that should open it. A row without a button is kept but does nothing; a row without an app disappears when you close this dialog with ↩ Back.</string>
+
+    <!-- Beta universal redirect: learn branded buttons (Apps, Live TV, ...) that send no keycode. -->
+    <string name="redirect_learn_added">Mapped %1$s</string>
+    <string name="redirect_learn_warn_title">This button opens a content app</string>
+    <string name="redirect_learn_warn_msg">%1$s is an app you watch, not a shell screen. Mapping its button makes %1$s unreachable everywhere, even from its own tile. Map it anyway?</string>
+    <string name="redirect_learn_warn_add">Map anyway</string>
+    <string name="redirect_learn_warn_cancel">Cancel</string>
+    <string name="map_button_opens_store">That button opens an Amazon Appstore page, not an app, so there is nothing to map. If the app is not installed, install it first and try again.</string>
+    <string name="map_button_opens_home">That button opened the Amazon home screen, not an app, so there\'s nothing to map. Make sure the app this button should open is installed and set up so it opens when you press the button. Only then can the button be redirected.</string>
+
+    <!-- Friendly names for bound launch keys, shown on the custom-launch-key row. -->
+    <string name="key_red">Red</string>
+    <string name="key_green">Green</string>
+    <string name="key_yellow">Yellow</string>
+    <string name="key_blue">Blue</string>
+    <string name="key_channel_up">Channel +</string>
+    <string name="key_channel_down">Channel -</string>
+    <string name="key_subtitles">Subtitles</string>
+    <string name="key_teletext">Teletext</string>
+    <string name="key_live_tv">Live TV</string>
+    <string name="key_play">Play</string>
+    <string name="key_rewind">Rewind</string>
+    <string name="key_forward">Fast-forward</string>
+    <string name="key_number">Number %1$d</string>
+
+    <string name="switch_verbose">Verbose logging (for debugging)</string>
+    <string name="switch_verbose_tip">Logs every key and window event the accessibility service receives, tagged HomeOnFire. View on-device with the button on the right, or with:\nadb logcat -s HomeOnFire</string>
+
+    <!-- Log viewer: round button in the verbose row + the full-screen view it opens. -->
+    <string name="log_button_desc">Show diagnostic log</string>
+    <string name="log_button_tip">Open a full-screen diagnostic view (Fire OS, accessibility status, target, recent log) you can photograph and share, no adb needed.</string>
+    <string name="log_viewer_title">Diagnostic log</string>
+
+    <!-- Info-dialog "open device settings" link. -->
+    <string name="info_dialog_device_info_link">Fire OS device info</string>
+
+    <!-- Loader animation, displayed during Home button transition. -->
+    <string name="loader_caption_loading">FireTV</string>
+    <!-- Shown instead when the loading screen covers an app a mapped button opened. -->
+    <string name="loader_caption_loading_app">FireTV</string>
+    <string name="loader_caption_ready">FireTV</string>
+
+    <!-- Header info button -->
+    <string name="info_button_glyph">ⓘ</string>
+    <string name="info_button_desc">About Home on Fire</string>
+    <string name="info_button_tip">App name, version, project link and Fire OS device info.</string>
+
+    <!-- Info dialog -->
+    <string name="info_dialog_version">Version %1$s</string>
+    <string name="info_dialog_version_unknown">?</string>
+    <string name="info_dialog_description">CleanMyTV Companion for Fire TV.\n\n• Single-click Home on CleanMyTV: Clears cache &amp; optimizes RAM\n• Triple-click Home: Returns to Amazon Launcher\n• Long-press Home: Opens Quick Settings HUD\n• RAM usage stays below 30 MB.</string>
+    <string name="info_dialog_ok">OK</string>
+
+    <!-- Toasts -->
+    <string name="toast_grant_via_adb">Run once via adb:\nadb shell pm grant io.github.toolicious.homeonfire android.permission.WRITE_SECURE_SETTINGS</string>
+    <string name="toast_no_browser">No browser installed.</string>
+    <string name="toast_settings_unavailable">Settings not available.</string>
+    <string name="toast_no_target">No target app set.</string>
+    <string name="toast_target_missing">Target app not installed: %1$s</string>
+    <string name="toast_no_launchable_apps">No launchable apps found to set as target.</string>
+
+    <!-- Picker -->
+    <string name="picker_title">Choose target app</string>
+
+    <!-- Beta: overlay-timing tuning rows (shown on all versions for layout
+         checking; the overlay itself only runs on Fire OS 7). -->
+    <string name="tuning_heading">Beta: overlay timing (Fire OS 7)</string>
+    <string name="tuning_grace">Start cover delay</string>
+    <string name="tuning_grace_tip">How soon the loading overlay covers the screen after you press ⌂ Home. Lower hides the Amazon home flash sooner. Press ◀ ▶ to change. Takes effect on Fire OS 7.</string>
+    <string name="tuning_hold">End hold</string>
+    <string name="tuning_hold_tip">How long the overlay stays solid after the launcher window appears, before it fades. Higher gives the launcher time to draw, hiding the flash at the end. Press ◀ ▶ to change. Takes effect on Fire OS 7.</string>
+    <string name="tuning_fade">Fade</string>
+    <string name="tuning_fade_tip">Cross-fade duration when the overlay lifts. Press ◀ ▶ to change. Takes effect on Fire OS 7.</string>
+    <string name="tuning_reset">Reset timing to defaults</string>
+    <!-- Filled from Prefs.DEFAULT_MASK_GRACE / HOLD / FADE so it can never drift from the code. -->
+    <string name="tuning_reset_tip">Restore start delay %1$d ms, end hold %2$d ms, fade %3$d ms.</string>
+    <string name="tuning_reset_done">Timing reset to defaults</string>
+</resources>

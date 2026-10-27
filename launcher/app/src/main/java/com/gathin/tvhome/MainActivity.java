@@ -12,6 +12,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ChangedPackages;
@@ -79,11 +80,15 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.Inet4Address;
+import java.net.NetworkInterface;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -272,6 +277,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private PopupWindow openPopup;
     /** Reorder mode is on (top-bar button). */
     private boolean reordering;
+    private boolean movingFromMenu;
     /** Key of the tile being carried in reorder mode, or null. */
     private String movingKey;
     /** Tile order when reorder mode started, to save only when something moved. */
@@ -294,6 +300,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private int dockEditSlot = -1;
     /** Tile menu's "Add to dock": the app waiting for a dock place in edit-dock mode, or null. */
     private String dockEditAppKey;
+    private String stockHomeRedirect = "";
     private AppLibraryDialog appLibrary;
     private boolean appLibrarySelection;
     private boolean libraryOkOpens;
@@ -426,6 +433,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         sourcePanelAction = cfg.sourcePanelAction;
         sourcePanelExtra = cfg.sourcePanelExtra;
         coocaaSources = cfg.coocaaSources;
+        stockHomeRedirect = cfg.stockHomeRedirect;
 
         root = findViewById(R.id.root);
         root.setBackgroundColor(cfg.backgroundColor);
@@ -709,7 +717,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnInputs = findViewById(R.id.btnInputs);
         View btnSettings = findViewById(R.id.btnSettings);
         btnInputs.setOnClickListener(v -> showInputs());
-        btnWifi.setOnClickListener(v -> openNetworkPill());
+        btnWifi.setOnClickListener(v -> showNetworkPanel());
         btnVpn.setOnClickListener(v -> openVpnPill());
         btnWifi.setOnLongClickListener(v -> {
             open(systemIntent(Settings.ACTION_WIFI_SETTINGS));
@@ -720,11 +728,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             ((TextView) btnSettings).setText(R.string.launcher_settings);
             ((TextView) btnSettings).setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_home_settings_pill, 0, 0, 0);
         }
-        btnSettings.setOnClickListener(v -> {
-            if (launcherSettingsButton) startActivityForResult(
-                    new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
-            else open(systemIntent(Settings.ACTION_SETTINGS));
-        });
+        btnSettings.setOnClickListener(v -> showSettingsPanel());
         btnReorder = findViewById(R.id.btnReorder);
         btnReorder.setOnClickListener(v -> toggleReorder());
         btnReorder.setVisibility(cfg.reorderButton ? View.VISIBLE : View.GONE);
@@ -911,18 +915,175 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        setIntent(intent);
         if (openLauncherSettingsIfAsked(intent)) return;
         if (openInputsIfAsked(intent)) return;
         if (intent == null || !intent.hasCategory(Intent.CATEGORY_HOME)) return;
         grid.scrollToPosition(0);
         lastFocused = 0;
         lastFocusedKey = adapter.getItemCount() > 0 ? adapter.keyAt(0) : null;
+        boolean clearCacheRequested = intent.getBooleanExtra("EXTRA_CLEAR_CACHE", false);
         if (stopped) {
             tileRefresh.onHomeAgain();
+            if (clearCacheRequested) {
+                clearCacheAndOptimize();
+            }
         } else {
-            // Still on screen (the quick panel was over it, or Home was already in front): the tiles are current,
-            // so only go back to the first one; rebuilding would replay the entrance animation for nothing.
             grid.post(() -> focusTile(0));
+            clearCacheAndOptimize();
+        }
+    }
+
+    /** Cache clearing and memory optimization triggered by Home button while on launcher. */
+    private void clearCacheAndOptimize() {
+        try {
+            java.io.File cacheDir = getCacheDir();
+            if (cacheDir != null && cacheDir.isDirectory()) {
+                deleteDirContents(cacheDir);
+            }
+            java.io.File codeCache = getCodeCacheDir();
+            if (codeCache != null && codeCache.isDirectory()) {
+                deleteDirContents(codeCache);
+            }
+            java.io.File extCache = getExternalCacheDir();
+            if (extCache != null && extCache.isDirectory()) {
+                deleteDirContents(extCache);
+            }
+            if (grid != null && grid.getRecycledViewPool() != null) {
+                grid.getRecycledViewPool().clear();
+            }
+            if (heroArtCache != null) {
+                heroArtCache.clear();
+                heroArtKey = null;
+            }
+            try {
+                Class<?> wmg = Class.forName("android.view.WindowManagerGlobal");
+                Object instance = wmg.getMethod("getInstance").invoke(null);
+                if (instance != null) {
+                    wmg.getMethod("trimMemory", int.class).invoke(instance, TRIM_MEMORY_COMPLETE);
+                }
+            } catch (Throwable ignored) {}
+            System.gc();
+            System.runFinalization();
+            Toast.makeText(this, "⚡ Cache Cleared • Memory Optimized", Toast.LENGTH_SHORT).show();
+        } catch (Throwable ignored) {}
+    }
+
+    private static void deleteDirContents(java.io.File dir) {
+        if (dir == null || !dir.isDirectory()) return;
+        java.io.File[] files = dir.listFiles();
+        if (files == null) return;
+        for (java.io.File file : files) {
+            if (file.isDirectory()) deleteDirContents(file);
+            file.delete();
+        }
+    }
+
+    /**
+     * Resolves and launches the stock/system launcher across TV platforms:
+     * Fire TV, Google TV, Android TV, PatchWall, and OEM launchers.
+     */
+    private void openStockLauncher() {
+        try {
+            PackageManager pm = getPackageManager();
+
+            // Disable Fire TV home interception so stock launcher stays default until CleanMyTV is reopened
+            try {
+                Intent disable = new Intent("io.github.nikhil2001gowda.homeonfire.ACTION_DISABLE_HIJACK");
+                sendBroadcast(disable);
+                Intent disableFallback = new Intent("io.github.toolicious.homeonfire.ACTION_DISABLE_HIJACK");
+                disableFallback.setPackage("io.github.toolicious.homeonfire");
+                sendBroadcast(disableFallback);
+            } catch (Throwable ignored) {
+            }
+
+            // For Android TV / Google TV, clear preferred activity so the system stays on native TV Home
+            try {
+                pm.clearPackagePreferredActivities(getPackageName());
+            } catch (Throwable ignored) {
+            }
+
+            List<String> candidates = new ArrayList<>();
+            // 1. Configured stock home redirect if set
+            if (stockHomeRedirect != null && !stockHomeRedirect.isEmpty()) {
+                candidates.add(stockHomeRedirect);
+            }
+
+            // 2. Hardware / OEM detection
+            if ("Amazon".equalsIgnoreCase(Build.MANUFACTURER)) {
+                candidates.add("com.amazon.tv.launcher");
+            }
+
+            // Standard Google TV and Android TV
+            candidates.add("com.google.android.apps.tv.launcherx"); // Google TV
+            candidates.add("com.google.android.tvlauncher");        // Android TV
+            candidates.add("com.mitv.tvhome");                      // Xiaomi PatchWall
+            candidates.add("com.amazon.tv.launcher");               // Fire TV
+            candidates.add("com.tcl.tvplayer");                     // TCL
+            candidates.add("com.tcl.waterfall.overseas");           // TCL
+            candidates.add("com.cvte.tv.launcher");                 // CVTE boards
+            candidates.add("com.android.launcher3");                // AOSP Generic
+
+            // 3. Dynamically discover any other installed CATEGORY_HOME activity
+            Intent queryHomes = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+            List<ResolveInfo> resolved = pm.queryIntentActivities(queryHomes, 0);
+            String myPkg = getPackageName();
+            for (ResolveInfo ri : resolved) {
+                if (ri.activityInfo != null && ri.activityInfo.packageName != null) {
+                    String p = ri.activityInfo.packageName;
+                    if (!p.equals(myPkg) && !p.equals("android") && !p.contains("resolver") && !candidates.contains(p)) {
+                        candidates.add(p);
+                    }
+                }
+            }
+
+            // 4. Try candidate packages
+            for (String targetPkg : candidates) {
+                try {
+                    Intent launchIntent = pm.getLeanbackLaunchIntentForPackage(targetPkg);
+                    if (launchIntent == null) {
+                        launchIntent = pm.getLaunchIntentForPackage(targetPkg);
+                    }
+                    if (launchIntent == null) {
+                        Intent q = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(targetPkg);
+                        List<ResolveInfo> matches = pm.queryIntentActivities(q, 0);
+                        if (!matches.isEmpty()) {
+                            ActivityInfo ai = matches.get(0).activityInfo;
+                            launchIntent = new Intent(Intent.ACTION_MAIN);
+                            launchIntent.addCategory(Intent.CATEGORY_HOME);
+                            launchIntent.setClassName(ai.packageName, ai.name);
+                        }
+                    }
+                    if (launchIntent != null) {
+                        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(launchIntent);
+
+                        String label = "Stock Home";
+                        if (targetPkg.contains("amazon")) {
+                            label = "Amazon Home";
+                        } else if (targetPkg.contains("launcherx")) {
+                            label = "Google TV Home";
+                        } else if (targetPkg.contains("tvlauncher")) {
+                            label = "Android TV Home";
+                        } else if (targetPkg.contains("mitv")) {
+                            label = "PatchWall";
+                        } else {
+                            try {
+                                CharSequence appLabel = pm.getApplicationLabel(pm.getApplicationInfo(targetPkg, 0));
+                                if (appLabel != null && appLabel.length() > 0) label = appLabel.toString();
+                            } catch (Throwable ignored) {
+                            }
+                        }
+                        Toast.makeText(this, "⚡ Switched to " + label, Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+
+            Toast.makeText(this, "No other TV launcher installed", Toast.LENGTH_SHORT).show();
+        } catch (Throwable t) {
+            Toast.makeText(this, "Stock Home unavailable", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -938,6 +1099,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         updateClockVisibility();
         tileRefresh.onStart();
+
+        // Re-enable Home hijacking so CleanMyTV stays default launcher while active
+        try {
+            Intent enable = new Intent("io.github.nikhil2001gowda.homeonfire.ACTION_ENABLE_HIJACK");
+            sendBroadcast(enable);
+            Intent enableFallback = new Intent("io.github.toolicious.homeonfire.ACTION_ENABLE_HIJACK");
+            enableFallback.setPackage("io.github.toolicious.homeonfire");
+            sendBroadcast(enableFallback);
+        } catch (Throwable ignored) {
+        }
     }
 
     @Override
@@ -996,6 +1167,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 lastPetalShower = today;
                 handler.postDelayed(this::playPetalShower, 450);
             }
+        }
+        if (getIntent() != null && getIntent().getBooleanExtra("EXTRA_CLEAR_CACHE", false)) {
+            getIntent().removeExtra("EXTRA_CLEAR_CACHE");
+            clearCacheAndOptimize();
         }
     }
 
@@ -1179,6 +1354,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         handler.removeCallbacks(clockCheck);
         stopped = true;
         tileRefresh.onStop();
+        onTrimMemory(TRIM_MEMORY_UI_HIDDEN);
+        try {
+            Class<?> wmg = Class.forName("android.view.WindowManagerGlobal");
+            Object instance = wmg.getMethod("getInstance").invoke(null);
+            wmg.getMethod("trimMemory", int.class).invoke(instance, TRIM_MEMORY_COMPLETE);
+        } catch (Throwable ignored) {
+        }
+        System.gc();
     }
 
     /**
@@ -1257,18 +1440,43 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      * - a tile carried: arrows move it; Back (or OK) puts it down and the mode stays on for the next one.
      * Other keys (volume, Home) pass through; leaving the launcher ends the mode and saves.
      */
+    private long lastHomePressTime = 0;
+    private int homeClickCount = 0;
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getKeyCode() == KeyEvent.KEYCODE_HOME || event.getKeyCode() == KeyEvent.KEYCODE_ALL_APPS) {
+            if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
+                long now = System.currentTimeMillis();
+                if (now - lastHomePressTime < 1800) {
+                    homeClickCount++;
+                } else {
+                    homeClickCount = 1;
+                }
+                lastHomePressTime = now;
+                if (homeClickCount >= 3) {
+                    homeClickCount = 0;
+                    openStockLauncher();
+                } else {
+                    clearCacheAndOptimize();
+                }
+            }
+            return true;
+        }
         // Vendor keys (TCL Netflix button, 4062) never reach the key services, only the focused window.
         if (event.getKeyCode() >= 1000 && RemoteKeys.handle(this, event, homeAppKeys.get(event.getKeyCode()), null)) return true;
         if (handleSettingsKey(event)) return true;
-        if (tileMenuEnabled && !reordering && openPopup == null && cardPrompt == null
+        if (!reordering && openPopup == null && cardPrompt == null
                 && event.getKeyCode() == KeyEvent.KEYCODE_MENU) {
             int position = focusedTilePosition();
             if (position >= 0 && position < adapter.appCount()
                     && !getPackageName().equals(adapter.packageAt(position))) {
                 if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
-                    onTileLongPress(position, getCurrentFocus());
+                    View card = null;
+                    RecyclerView.ViewHolder vh = grid.findViewHolderForAdapterPosition(position);
+                    if (vh != null) card = vh.itemView.findViewById(R.id.card);
+                    if (card == null) card = getCurrentFocus();
+                    onTileLongPress(position, card);
                 }
                 return true;
             }
@@ -1289,14 +1497,21 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     if (down) moveBy(code);
                     return true;
                 default:
-                    if (ok || back) {
-                        if (!down) drop();
+                    if (ok || back || code == KeyEvent.KEYCODE_MENU) {
+                        if (!down) {
+                            drop();
+                            if (movingFromMenu || code == KeyEvent.KEYCODE_MENU) {
+                                endReorder();
+                                movingFromMenu = false;
+                                Toast.makeText(this, "✓ " + getString(R.string.tile_move), Toast.LENGTH_SHORT).show();
+                            }
+                        }
                         return true;
                     }
                     return super.dispatchKeyEvent(event);
             }
         }
-        if (back) {
+        if (back || code == KeyEvent.KEYCODE_MENU) {
             if (!down) endReorder();
             return true;
         }
@@ -1322,8 +1537,22 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** Adapter position of the focused tile, or -1 when focus is not on a tile. */
     private int focusedTilePosition() {
         View f = getCurrentFocus();
-        if (f == null || f.getId() != R.id.card || !(f.getParent() instanceof View)) return -1;
-        return grid.getChildAdapterPosition((View) f.getParent());
+        if (f == null) return -1;
+        if (f.getId() == R.id.card && f.getParent() instanceof View) {
+            return grid.getChildAdapterPosition((View) f.getParent());
+        }
+        View v = f;
+        while (v != null && v != grid) {
+            if (v.getParent() == grid) {
+                return grid.getChildAdapterPosition(v);
+            }
+            if (v.getParent() instanceof View) {
+                v = (View) v.getParent();
+            } else {
+                break;
+            }
+        }
+        return -1;
     }
 
     /** The reorder button: turns the mode on (focus goes back to the last tile), or off again. */
@@ -1486,6 +1715,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** Ends the mode and saves the order if it changed since the mode started. */
     private void endReorder() {
         if (!reordering) return;
+        movingFromMenu = false;
         dockEditing = false;
         dockEditSlot = -1;
         dockEditAppKey = null;
@@ -2847,10 +3077,49 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         return SystemSettings.intent(this, standardAction);
     }
 
+    /**
+     * Checks if this device is an external streaming stick, player or dongle (e.g. Fire TV Stick)
+     * rather than an integrated television display with physical input ports.
+     */
+    static boolean isStreamingStickOrBox(Context ctx) {
+        // 1. ro.hdmi.device_type: 4 is Playback (dongle/stick/STB), 0 is TV (integrated television)
+        String hdmiType = getSystemProperty("ro.hdmi.device_type");
+        if ("4".equals(hdmiType)) return true;
+
+        // 2. Fire TV specific hardware models & features
+        String mfg = Build.MANUFACTURER != null ? Build.MANUFACTURER : "";
+        String model = Build.MODEL != null ? Build.MODEL.toUpperCase(Locale.ROOT) : "";
+        if ("Amazon".equalsIgnoreCase(mfg) || model.startsWith("AFT")) {
+            // Known Fire TV sticks and media player dongles
+            if (model.equals("AFTM") || model.equals("AFTA") || model.equals("AFTMM")
+                    || model.equals("AFTSS") || model.equals("AFTSSS") || model.equals("AFTKA")
+                    || model.equals("AFTKM") || model.equals("AFTKRT") || model.equals("AFTB")
+                    || model.equals("AFTS") || model.equals("AFTN") || model.equals("AFTAHR")
+                    || model.equals("AFTR") || model.equals("AFTGAZL")) {
+                return true;
+            }
+            String prod = Build.PRODUCT != null ? Build.PRODUCT.toLowerCase(Locale.ROOT) : "";
+            if (prod.contains("stick") || prod.contains("dongle") || prod.contains("pendant")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String getSystemProperty(String key) {
+        try {
+            Class<?> sp = Class.forName("android.os.SystemProperties");
+            return (String) sp.getMethod("get", String.class, String.class).invoke(null, key, "");
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
     /** Hides the Inputs pill when it would have nothing to list: streaming boxes have no HDMI-in, AV or tuner. */
     private void updateInputsButton() {
-        if (!showInputsPill) {
+        if (!showInputsPill || isStreamingStickOrBox(this)) {
             btnInputs.setVisibility(View.GONE);
+            showInputsMenuRow = false;
             return;
         }
         boolean any = liveTvIntent() != null || !sourcePanelService.isEmpty()
@@ -2858,6 +3127,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
         if (!any && tim != null) {
             for (TvInputInfo info : tim.getTvInputList()) {
+                String id = info.getId();
+                if (id != null && id.toLowerCase(Locale.ROOT).contains("arc")) continue;
                 // Inputs hidden in Settings > Inputs are left out of the menu, so they don't count here either.
                 if (info.isPassthroughInput() && !info.isHidden(this)) {
                     any = true;
@@ -2866,6 +3137,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
         }
         btnInputs.setVisibility(any ? View.VISIBLE : View.GONE);
+        showInputsMenuRow = any;
     }
 
     /** boot_to_live_tv, or the Open on start app: the first time Home comes up after the TV starts, open that app
@@ -3080,6 +3352,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 }
                 // Inputs hidden in the TV's Settings > Inputs stay out of the menu too.
                 if (!info.isPassthroughInput() || info.isHidden(this)) continue;
+                if (info.getId() != null && info.getId().toLowerCase(Locale.ROOT).contains("arc")) continue;
                 // input_sources can leave out ports the board reports but the set does not have ("HW8=-").
                 if (Integer.valueOf(-1).equals(mappedSource(info.getId()))) continue;
                 // A CEC device's row is added with its port, below.
@@ -3268,7 +3541,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         PopupWindow popup = glassPopup(panel, (int) (220 * density));
         // Inputs opens its own list once this one has closed.
         if (showInputsMenuRow) addInputRow(rows, popup, R.drawable.ic_input, getString(R.string.inputs), -1, () -> root.post(this::showInputs));
-        addInputRow(rows, popup, R.drawable.ic_wifi, getString(R.string.quick_network), -1, this::openNetworkPill);
+        addInputRow(rows, popup, R.drawable.ic_wifi, getString(R.string.quick_network), -1, () -> root.post(this::showNetworkPanel));
         CharSequence network = wifiIconOnly ? btnWifi.getContentDescription() : btnWifi.getText();
         if (!TextUtils.isEmpty(network)) {
             TextView status = rows.getChildAt(rows.getChildCount() - 1).findViewById(R.id.status);
@@ -3287,6 +3560,192 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         popup.setWidth(Math.max((int) (220 * density), Math.min(panel.getMeasuredWidth(), (int) (360 * density))));
         dropIn(popup, panel, anchor, getResources().getBoolean(R.bool.rtl_menu_bar) ? Gravity.START : Gravity.END);
         rows.getChildAt(0).requestFocus();
+    }
+
+    static boolean isFireTv() {
+        String mfg = Build.MANUFACTURER != null ? Build.MANUFACTURER : "";
+        String model = Build.MODEL != null ? Build.MODEL.toUpperCase(Locale.ROOT) : "";
+        return "Amazon".equalsIgnoreCase(mfg) || model.startsWith("AFT");
+    }
+
+    private static String getLocalIpAddress() {
+        try {
+            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements();) {
+                NetworkInterface intf = en.nextElement();
+                if (intf.isLoopback() || !intf.isUp()) continue;
+                for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); enumIpAddr.hasMoreElements();) {
+                    InetAddress addr = enumIpAddr.nextElement();
+                    if (!addr.isLoopbackAddress() && addr instanceof Inet4Address) {
+                        return addr.getHostAddress();
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private View addPanelRow(LinearLayout rows, PopupWindow popup, int iconRes, String title, String statusText, boolean showDot, Runnable action) {
+        View row = getLayoutInflater().inflate(R.layout.item_input, rows, false);
+        ((ImageView) row.findViewById(R.id.icon)).setImageResource(iconRes);
+        ((TextView) row.findViewById(R.id.title)).setText(title);
+        TextView status = row.findViewById(R.id.status);
+        View dot = row.findViewById(R.id.dot);
+        if (!TextUtils.isEmpty(statusText)) {
+            status.setText(statusText);
+            status.setVisibility(View.VISIBLE);
+        } else {
+            status.setVisibility(View.GONE);
+        }
+        dot.setVisibility(showDot ? View.VISIBLE : View.GONE);
+        if (action != null) {
+            row.setFocusable(true);
+            row.setClickable(true);
+            row.setOnClickListener(v -> {
+                popup.dismiss();
+                action.run();
+            });
+        } else {
+            row.setFocusable(false);
+            row.setClickable(false);
+        }
+        rows.addView(row);
+        return row;
+    }
+
+    /** Dropdown popup for the Wi-Fi pill: network details, signal info, and settings redirect. */
+    private void showNetworkPanel() {
+        View anchor = findViewById(R.id.btnWifi);
+        View panel = getLayoutInflater().inflate(R.layout.popup_inputs, root, false);
+        LinearLayout rows = panel.findViewById(R.id.rows);
+
+        int width = Math.max((int) (260 * density), anchor.getWidth());
+        PopupWindow popup = glassPopup(panel, width);
+
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        Network active = cm != null ? cm.getActiveNetwork() : null;
+        NetworkCapabilities caps = active != null ? cm.getNetworkCapabilities(active) : null;
+        boolean online = caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+        boolean validated = caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+        boolean isEthernet = caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET);
+        boolean isWifi = caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+
+        WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        WifiInfo info = wm != null ? wm.getConnectionInfo() : null;
+        String ssid = info != null ? info.getSSID() : null;
+        if (ssid != null) {
+            ssid = ssid.replace("\"", "").trim();
+            if (ssid.contains("unknown") || ssid.equals("0x") || ssid.isEmpty()) ssid = null;
+        }
+
+        String netName = isEthernet ? getString(R.string.ethernet)
+                : (isWifi && ssid != null) ? ssid
+                : isWifi ? getString(R.string.quick_network)
+                : getString(R.string.offline);
+        int netIcon = isEthernet ? R.drawable.ic_ethernet : R.drawable.ic_wifi;
+        String netStatus = !online ? getString(R.string.offline)
+                : validated ? "Connected • Online"
+                : getString(R.string.connected);
+
+        // 1. Current Network row (Clicking also opens Wi-Fi settings)
+        addPanelRow(rows, popup, netIcon, netName, netStatus, online, () -> open(systemIntent(Settings.ACTION_WIFI_SETTINGS)));
+
+        // 2. IP Address row
+        String ip = getLocalIpAddress();
+        if (ip != null) {
+            addPanelRow(rows, popup, R.drawable.ic_input, "IP Address", ip, false, null);
+        }
+
+        // 3. Wi-Fi Band & Signal Details
+        if (isWifi && info != null) {
+            int freq = info.getFrequency();
+            String band = (freq >= 4900 && freq < 5900) ? "5 GHz"
+                    : (freq >= 2400 && freq < 2500) ? "2.4 GHz"
+                    : (freq > 5900) ? "6 GHz" : "";
+            int speed = info.getLinkSpeed();
+            int rssi = info.getRssi();
+            int level = WifiManager.calculateSignalLevel(rssi, 5);
+            String signalQuality = level >= 4 ? "Excellent" : level >= 3 ? "Good" : level >= 2 ? "Fair" : "Weak";
+
+            StringBuilder details = new StringBuilder();
+            if (!band.isEmpty()) details.append(band);
+            if (speed > 0) {
+                if (details.length() > 0) details.append(" • ");
+                details.append(speed).append(" Mbps");
+            }
+            if (rssi != 0 && rssi != -127) {
+                if (details.length() > 0) details.append(" (").append(signalQuality).append(")");
+            }
+            if (details.length() > 0) {
+                addPanelRow(rows, popup, R.drawable.ic_wifi, "Signal & Speed", details.toString(), false, null);
+            }
+        }
+
+        addSeparator(rows);
+
+        // 4. Redirect to Fire TV / System Wi-Fi settings
+        String settingsLabel = isFireTv() ? "Fire TV Network Settings" : "Wi-Fi Settings";
+        addPanelRow(rows, popup, R.drawable.ic_settings, settingsLabel, "Open", false, this::openNetworkPill);
+
+        // 5. Refresh connection status
+        addPanelRow(rows, popup, R.drawable.ic_swap_vert, "Refresh Status", "Check", false, () -> {
+            updateWifiLabel();
+            Toast.makeText(this, "Network status refreshed", Toast.LENGTH_SHORT).show();
+        });
+
+        panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        popup.setWidth(Math.max((int) (260 * density), Math.min(panel.getMeasuredWidth(), (int) (360 * density))));
+        dropIn(popup, panel, anchor, getResources().getBoolean(R.bool.rtl_menu_bar) ? Gravity.START : Gravity.END);
+
+        for (int i = 0; i < rows.getChildCount(); i++) {
+            View child = rows.getChildAt(i);
+            if (child.isFocusable()) {
+                child.requestFocus();
+                break;
+            }
+        }
+    }
+
+    /** Dropdown popup for the Settings pill: CleanMyTV controls and system settings. */
+    private void showSettingsPanel() {
+        View anchor = findViewById(R.id.btnSettings);
+        View panel = getLayoutInflater().inflate(R.layout.popup_inputs, root, false);
+        LinearLayout rows = panel.findViewById(R.id.rows);
+
+        int width = Math.max((int) (260 * density), anchor.getWidth());
+        PopupWindow popup = glassPopup(panel, width);
+
+        // 1. CleanMyTV Launcher Settings
+        addPanelRow(rows, popup, R.drawable.ic_home_settings_pill, getString(R.string.launcher_settings), "UI & UX", false, () -> {
+            startActivityForResult(new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
+        });
+
+        // 2. Native System Settings (Fire TV, Google TV, Android TV, Xiaomi)
+        addPanelRow(rows, popup, R.drawable.ic_settings, getString(R.string.native_settings), "System", false, () -> {
+            Intent vendor = SystemSettings.vendorIntent(this);
+            open(vendor != null ? vendor : systemIntent(Settings.ACTION_SETTINGS));
+        });
+
+        // 3. Switch to TV Home (Native) - compatible with Fire TV, Google TV, Android TV, and OEM sets
+        addPanelRow(rows, popup, R.drawable.ic_apps, "TV Home (Native)", "Switch", false, this::openStockLauncher);
+
+        addSeparator(rows);
+
+        // 5. Reorder Apps
+        addPanelRow(rows, popup, R.drawable.ic_swap_vert, getString(R.string.reorder), "Grid", false, this::toggleReorder);
+
+        // 6. Optimize System Memory
+        addPanelRow(rows, popup, R.drawable.ic_input, "Optimize Memory", "Clean RAM", false, () -> {
+            System.gc();
+            Toast.makeText(this, "Launcher memory optimized", Toast.LENGTH_SHORT).show();
+        });
+
+        panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        popup.setWidth(Math.max((int) (260 * density), Math.min(panel.getMeasuredWidth(), (int) (360 * density))));
+        dropIn(popup, panel, anchor, getResources().getBoolean(R.bool.rtl_menu_bar) ? Gravity.START : Gravity.END);
+
+        if (rows.getChildCount() > 0) {
+            rows.getChildAt(0).requestFocus();
+        }
     }
 
     /** The header opens launcher settings directly; hold OK keeps the extra home actions available. */
@@ -3343,6 +3802,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (!beginReorder()) return;
             int at = adapter.positionOf(key);   // beginReorder can rebuild the tiles
             if (at < 0) return;
+            movingFromMenu = true;
             focusTile(at);
             pickUp(at);
             Toast.makeText(this, R.string.reorder_hint, Toast.LENGTH_LONG).show();
@@ -3351,6 +3811,22 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (LibraryApps.save(this, pkg, false)) reloadApps(false);
             else Toast.makeText(this, R.string.library_save_failed, Toast.LENGTH_LONG).show();
         });
+        boolean isSystem = false;
+        try {
+            ApplicationInfo ai = getPackageManager().getApplicationInfo(pkg, 0);
+            isSystem = (ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
+        } catch (PackageManager.NameNotFoundException ignored) {}
+        if (!isSystem) {
+            addSettingsMenuRow(rows, popup, R.string.tile_uninstall, () -> {
+                Intent uninstall = new Intent(Intent.ACTION_DELETE, Uri.parse("package:" + pkg));
+                uninstall.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                try {
+                    startActivity(uninstall);
+                } catch (ActivityNotFoundException | SecurityException e) {
+                    Toast.makeText(this, getString(R.string.cant_open, adapter.labelAt(position)), Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
         // Some firmware has no App info page at all; a row that only toasts "can't open" helps nobody.
         Intent info = SystemSettings.appInfo(this, pkg);
         if (info != null) addSettingsMenuRow(rows, popup, R.string.library_app_info, () -> open(info));
@@ -3358,9 +3834,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         popup.setWidth(Math.max((int) (200 * density), panel.getMeasuredWidth()));
         // Dock tiles sit near the bottom of the screen: open the menu above the tile when it would not fit below.
         int[] at = new int[2];
-        card.getLocationInWindow(at);
+        if (card != null) card.getLocationInWindow(at);
         int gap = (int) (10 * density), height = panel.getMeasuredHeight();
-        if (at[1] + card.getHeight() + gap + height <= root.getHeight()) {
+        int cardHeight = card != null ? card.getHeight() : (int) (120 * density);
+        if (card != null && at[1] + cardHeight + gap + height <= root.getHeight()) {
             dropIn(popup, panel, card, Gravity.START);
         } else {
             panel.setAlpha(0f);

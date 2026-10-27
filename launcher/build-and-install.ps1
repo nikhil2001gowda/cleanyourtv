@@ -40,11 +40,22 @@ $py = '..\tools\venv\Scripts\python.exe'
 # Which app owns Home differs by build; ask the TV, but only accept a launcher we recognise (the answer
 # can also be Android's chooser "android", the setup wizard, or another third-party launcher).
 $knownStock = @('com.google.android.tvlauncher', 'com.google.android.apps.tv.launcherx', 'com.google.android.leanbacklauncher', 'com.mitv.tvhome')
+$tvManufacturer = (& $py -I ..\tools\tv.py 'getprop ro.product.manufacturer' 2>$null) -join ''
+$tvManufacturer = "$tvManufacturer".Trim()
+$isFireTv = $false
+if ($tvManufacturer -eq 'Amazon') {
+    $isFireTv = $true
+}
 if (-not $StockLauncher) {
     $homePkg = & $py -I ..\tools\tv.py 'cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME' | Select-Object -Last 1
     if ($LASTEXITCODE -ne 0 -or -not $homePkg) { throw 'could not ask the TV which launcher owns Home; check -TvHost and the debugging prompt, or pass -StockLauncher <package>' }
     $homePkg = "$homePkg".Trim().Split('/')[0]
-    if ($knownStock -contains $homePkg) { $StockLauncher = $homePkg }
+    if ($isFireTv -or $homePkg -eq 'com.amazon.tv.launcher') {
+        $isFireTv = $true
+        $StockLauncher = 'none'
+        Write-Host "Detected Amazon Fire TV ($tvManufacturer). CleanMyTV will be installed with Home on Fire companion."
+    }
+    elseif ($knownStock -contains $homePkg) { $StockLauncher = $homePkg }
     elseif ($homePkg -eq 'com.gathin.tvhome') { $StockLauncher = 'none'; Write-Host 'Home already belongs to this launcher; nothing will be disabled.' }
     elseif ($homePkg -eq 'android') {
         # Android's chooser: launchers tie and no default is set (a restore followed by a re-applied list
@@ -71,21 +82,44 @@ if ($LASTEXITCODE -ne 0 -or "$out" -notmatch 'Success') { throw 'pm install fail
 # drops the inner double quotes from a native argument.
 's=$(settings get secure enabled_accessibility_services); a=$(settings get secure accessibility_enabled); am force-stop com.gathin.tvhome; case "$s" in *com.gathin.tvhome*) settings put secure enabled_accessibility_services ""; settings put secure enabled_accessibility_services "$s"; settings put secure accessibility_enabled "$a" ;; esac' |
     & $py -I ..\tools\tv.py --batch | Out-Null
-# Android 9 only accepts a component here; Android 10+ also takes a bare package name.
-$out = & $py -I ..\tools\tv.py 'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity'
-Write-Host $out
-if ($LASTEXITCODE -ne 0 -or "$out" -match 'Error') { throw 'could not set the new launcher as home; the stock launcher was left untouched' }
+if (-not $isFireTv) {
+    # Android 9 only accepts a component here; Android 10+ also takes a bare package name.
+    $out = & $py -I ..\tools\tv.py 'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity'
+    Write-Host $out
+    if ($LASTEXITCODE -ne 0 -or "$out" -match 'Error') { throw 'could not set the new launcher as home; the stock launcher was left untouched' }
+}
 # Start the launcher on its own, before the stock Home is touched (see build-and-install.sh, #239):
 # in the batch a failed start only prints an Error line and the stock launcher would be disabled anyway.
 $start = (& $py -I ..\tools\tv.py 'am start -W -a android.intent.action.MAIN -c android.intent.category.HOME -n com.gathin.tvhome/.MainActivity') -join "`n"
 Write-Host $start
 if ($LASTEXITCODE -ne 0 -or $start -notmatch 'Status: ok' -or $start -match '(?m)^Error') { throw "the new launcher did not start (see above); $StockLauncher was left enabled" }
-@(
-    'pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION 2>/dev/null; echo location-granted',
-    'cmd package compile -m speed -f com.gathin.tvhome',
-    $disableStock,
-    'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity'
-) | & $py -I ..\tools\tv.py --batch
+if ($isFireTv) {
+    $homeOnFireDir = '..\home-on-fire'
+    $homeOnFireApk = Join-Path $homeOnFireDir 'home-on-fire.apk'
+    if (Test-Path $homeOnFireApk) {
+        Write-Host 'Installing Home on Fire companion...'
+        & $py -I ..\tools\b64push.py $homeOnFireApk /data/local/tmp/homeonfire.apk
+        & $py -I ..\tools\tv.py 'pm install -r /data/local/tmp/homeonfire.apk; rm -f /data/local/tmp/homeonfire.apk'
+    }
+    @(
+        'pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION 2>/dev/null; echo location-granted',
+        'pm grant com.gathin.tvhome android.permission.WRITE_SECURE_SETTINGS 2>/dev/null; echo secure-settings-tvhome-granted',
+        'pm grant io.github.toolicious.homeonfire android.permission.WRITE_SECURE_SETTINGS 2>/dev/null; echo secure-settings-homeonfire-granted',
+        'cmd appops set com.gathin.tvhome AUTO_START allow 2>/dev/null; cmd appops set com.gathin.tvhome APP_AUTO_START allow 2>/dev/null',
+        'cmd appops set io.github.toolicious.homeonfire AUTO_START allow 2>/dev/null; cmd appops set io.github.toolicious.homeonfire APP_AUTO_START allow 2>/dev/null',
+        'appops write-settings 2>/dev/null',
+        'cmd package compile -m speed -f com.gathin.tvhome',
+        'cmd package compile -m speed -f io.github.toolicious.homeonfire 2>/dev/null',
+        's=$(settings get secure enabled_accessibility_services); for svc in io.github.toolicious.homeonfire/.HijackService com.gathin.tvhome/.HomeKeyService; do case "$s" in *"$svc"*) ;; null|"") s="$svc" ;; *) s="$s:$svc" ;; esac; done; settings put secure enabled_accessibility_services "$s"; settings put secure accessibility_enabled 1; echo accessibility-configured'
+    ) | & $py -I ..\tools\tv.py --batch
+} else {
+    @(
+        'pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION 2>/dev/null; echo location-granted',
+        'cmd package compile -m speed -f com.gathin.tvhome',
+        $disableStock,
+        'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity'
+    ) | & $py -I ..\tools\tv.py --batch
+}
 # A failed batch is not fatal here: the stock launcher may already be disabled, so fall through to the
 # Home check, which rolls back when Home is not ours.
 if ($LASTEXITCODE -ne 0) { Write-Warning "tv.py --batch failed (exit code $LASTEXITCODE); checking where Home ended up" }
@@ -131,14 +165,18 @@ function Undo-Handover {
 }
 # Order matters, see build-and-install.sh: start the new launcher, disable the stock one, set the
 # preference last, then check where Home ended up and put the stock launcher back if it is not ours.
-$homeNow = Get-HomeNow
-if ($homeNow -notlike 'com.gathin.tvhome/*') {
-    $reason = if ($homeNow) { "Home resolves to '$homeNow', not to the new launcher" } else { 'the TV stopped answering while Home was being switched, so the outcome is unknown' }
-    $restored = Undo-Handover
-    $hint = if ($homeNow) { ' On Google TV this usually means com.google.android.tungsten.setupwraith also claims Home: add it to your debloat list (see README, Troubleshooting), apply it, then run this script again.' } else { '' }
-    throw "$reason; $(if ($restored) { "$StockLauncher was re-enabled." } else { 'recovery is incomplete (see above).' })$hint"
+if ($isFireTv) {
+    Write-Host 'Fire TV: CleanMyTV and Home on Fire installed and configured as pure clean TV.'
+} else {
+    $homeNow = Get-HomeNow
+    if ($homeNow -notlike 'com.gathin.tvhome/*') {
+        $reason = if ($homeNow) { "Home resolves to '$homeNow', not to the new launcher" } else { 'the TV stopped answering while Home was being switched, so the outcome is unknown' }
+        $restored = Undo-Handover
+        $hint = if ($homeNow) { ' On Google TV this usually means com.google.android.tungsten.setupwraith also claims Home: add it to your debloat list (see README, Troubleshooting), apply it, then run this script again.' } else { '' }
+        throw "$reason; $(if ($restored) { "$StockLauncher was re-enabled." } else { 'recovery is incomplete (see above).' })$hint"
+    }
+    Write-Host "Home now resolves to $homeNow"
 }
-Write-Host "Home now resolves to $homeNow"
 # Optional accessibility services, appended to enabled_accessibility_services without dropping others.
 function Enable-Service([string]$Name) {
     $svc = "com.gathin.tvhome/.$Name"

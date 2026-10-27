@@ -2,7 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF101419"
+    android:background="@drawable/settings_bg"
     android:fillViewport="true">
 
     <LinearLayout
@@ -19,6 +19,8 @@
             android:layout_height="wrap_content"
             android:text="@string/launcher_settings"
             android:textColor="#FFFFFFFF"
+            android:fontFamily="@string/font_medium"
+            android:letterSpacing="0.01"
             android:textSize="34sp" />
 
         <TextView

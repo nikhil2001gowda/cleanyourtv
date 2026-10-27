@@ -17,6 +17,7 @@ import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.view.KeyEvent;
@@ -212,6 +213,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private final Map<String, String> launchActions;
     /** Hold OK opens the activity's tile menu (config.xml, tile_menu); false opens App info, as before. */
     private final boolean tileMenu;
+    private final boolean isFireTv;
     /** Tile names and bundled banners that replace the app's own (config.xml, app_labels and app_banners). */
     private final Map<String, String> appLabels, appBanners;
     /** Every app tile is its icon on a card tinted from that icon, never its banner (config.xml, uniform_tiles). */
@@ -220,9 +222,20 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private final Set<String> iconTiles;
     private final List<Entry> items = new ArrayList<>();
 
+    private static boolean checkIsFireTv(Context ctx) {
+        if ("Amazon".equalsIgnoreCase(Build.MANUFACTURER)) return true;
+        try {
+            PackageManager pm = ctx.getPackageManager();
+            if (pm.hasSystemFeature("amazon.hardware.fire_tv")) return true;
+            if (pm.getPackageInfo("com.amazon.tv.launcher", 0) != null) return true;
+        } catch (Exception ignored) {}
+        return false;
+    }
+
     AppAdapter(Context ctx, TileListener listener, int dockSize, Config cfg) {
         this.ctx = ctx;
         this.listener = listener;
+        this.isFireTv = checkIsFireTv(ctx);
         this.dockSize = dockSize;
         this.favourites = cfg.dockApps;
         this.fillDock = cfg.fillDock;
@@ -506,7 +519,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         }
         h.card.setOnClickListener(v -> launch(e));
         h.card.setOnLongClickListener(v -> {
-            if (tileMenu) {
+            if (tileMenu || isFireTv) {
                 int pos = h.getBindingAdapterPosition();
                 if (pos != RecyclerView.NO_POSITION) listener.onTileLongPress(pos, v);
                 return true;

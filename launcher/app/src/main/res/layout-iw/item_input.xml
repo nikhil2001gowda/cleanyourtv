@@ -17,11 +17,16 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textColor="@drawable/pill_text_dim"
+        android:background="@drawable/status_badge_bg"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
         android:duplicateParentState="true"
-        android:textSize="11sp"
+        android:textSize="12sp"
         android:textDirection="locale"
-        android:fontFamily="@string/font_body"
-        android:letterSpacing="0.04" />
+        android:fontFamily="@string/font_medium"
+        android:letterSpacing="0.01" />
 
     <View
         android:id="@+id/dot"

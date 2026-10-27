@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    CleanMyTV minimalist Apple TV style icon.
+    Replaces Home on Fire branding with a sleek TV logo.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- Minimalist screen outline -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 8,10 L 40,10 C 42.2,10 44,11.8 44,14 L 44,32 C 44,34.2 42.2,36 40,36 L 8,36 C 5.8,36 4,34.2 4,32 L 4,14 C 4,11.8 5.8,10 8,10 Z" />
+
+    <!-- Sleek stand base -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M 24,36 L 24,40 M 16,40 L 32,40" />
+
+    <!-- Screen inner accent -->
+    <path
+        android:fillColor="#FFFF9E3D"
+        android:pathData="M 21,19 L 29,23.5 L 21,28 Z" />
+</vector>

@@ -57,40 +57,51 @@ export PATH="$JAVA_HOME/bin:$PATH"
 # the setup wizard, or another third-party launcher, none of which should be disabled by accident.
 # Pass STOCK_LAUNCHER=<package> to name it yourself, or STOCK_LAUNCHER=none to disable nothing.
 KNOWN_STOCK_LAUNCHERS="com.google.android.tvlauncher com.google.android.apps.tv.launcherx com.google.android.leanbacklauncher com.mitv.tvhome"
+TV_MANUFACTURER=$("$PY" -I ../tools/tv.py 'getprop ro.product.manufacturer' 2>/dev/null | tr -d '\r' || true)
+IS_FIRE_TV=0
+if [ "$TV_MANUFACTURER" = "Amazon" ]; then
+  IS_FIRE_TV=1
+fi
 if [ -z "${STOCK_LAUNCHER:-}" ]; then
   HOME_PKG=$("$PY" -I ../tools/tv.py 'cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME' \
     | tail -n 1 | tr -d '\r' | cut -d/ -f1) || {
     echo "ERROR: could not ask the TV which launcher owns Home. Check TV_HOST and the debugging prompt on the TV," >&2
     echo "or pass STOCK_LAUNCHER=<package> yourself." >&2; exit 1; }
-  case " $KNOWN_STOCK_LAUNCHERS " in
-    *" $HOME_PKG "*) STOCK_LAUNCHER=$HOME_PKG ;;
-    *)
-      if [ "$HOME_PKG" = com.gathin.tvhome ]; then
-        STOCK_LAUNCHER=none; echo "Home already belongs to this launcher; nothing will be disabled."
-      elif [ "$HOME_PKG" = android ]; then
-        # Android's chooser: two or more launchers tie and no default is set, which is where a TV lands
-        # after tools/restore.sh followed by a re-applied list. Take the one known stock launcher among
-        # the HOME claimants, if there is exactly one.
-        CLAIMANTS=$("$PY" -I ../tools/tv.py 'cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME' \
-          | tr -d '\r' | grep -o '[A-Za-z0-9_.]*/' | tr -d / | sort -u)
-        FOUND=""; N=0
-        for k in $KNOWN_STOCK_LAUNCHERS; do
-          if printf '%s\n' "$CLAIMANTS" | grep -qx "$k"; then FOUND=$k; N=$((N + 1)); fi
-        done
-        if [ "$N" -eq 1 ]; then
-          STOCK_LAUNCHER=$FOUND; echo "Home is Android's chooser; the stock launcher among the candidates is $STOCK_LAUNCHER."
+  if [ "$IS_FIRE_TV" -eq 1 ] || [ "$HOME_PKG" = "com.amazon.tv.launcher" ]; then
+    IS_FIRE_TV=1
+    STOCK_LAUNCHER=none
+    echo "Detected Amazon Fire TV ($TV_MANUFACTURER). CleanMyTV will be installed with Home on Fire companion."
+  else
+    case " $KNOWN_STOCK_LAUNCHERS " in
+      *" $HOME_PKG "*) STOCK_LAUNCHER=$HOME_PKG ;;
+      *)
+        if [ "$HOME_PKG" = com.gathin.tvhome ]; then
+          STOCK_LAUNCHER=none; echo "Home already belongs to this launcher; nothing will be disabled."
+        elif [ "$HOME_PKG" = android ]; then
+          # Android's chooser: two or more launchers tie and no default is set, which is where a TV lands
+          # after tools/restore.sh followed by a re-applied list. Take the one known stock launcher among
+          # the HOME claimants, if there is exactly one.
+          CLAIMANTS=$("$PY" -I ../tools/tv.py 'cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME' \
+            | tr -d '\r' | grep -o '[A-Za-z0-9_.]*/' | tr -d / | sort -u)
+          FOUND=""; N=0
+          for k in $KNOWN_STOCK_LAUNCHERS; do
+            if printf '%s\n' "$CLAIMANTS" | grep -qx "$k"; then FOUND=$k; N=$((N + 1)); fi
+          done
+          if [ "$N" -eq 1 ]; then
+            STOCK_LAUNCHER=$FOUND; echo "Home is Android's chooser; the stock launcher among the candidates is $STOCK_LAUNCHER."
+          else
+            echo "ERROR: Home is Android's launcher chooser and $N known stock launchers claim Home: pick a default on the TV first," >&2
+            echo "or run again with STOCK_LAUNCHER=<package to disable> or STOCK_LAUNCHER=none." >&2; exit 1
+          fi
         else
-          echo "ERROR: Home is Android's launcher chooser and $N known stock launchers claim Home: pick a default on the TV first," >&2
-          echo "or run again with STOCK_LAUNCHER=<package to disable> or STOCK_LAUNCHER=none." >&2; exit 1
-        fi
-      else
-        echo "ERROR: Home currently resolves to '${HOME_PKG:-nothing}', which is not a stock launcher this script knows." >&2
-        echo "  android                                  = Android's launcher chooser (two launchers tie); pick a default on the TV first" >&2
-        echo "  com.google.android.tungsten.setupwraith  = Google TV's setup wizard; see README, Troubleshooting" >&2
-        echo "  anything else                            = another launcher is the default" >&2
-        echo "Run again with STOCK_LAUNCHER=<package to disable> or STOCK_LAUNCHER=none." >&2; exit 1
-      fi ;;
-  esac
+          echo "ERROR: Home currently resolves to '${HOME_PKG:-nothing}', which is not a stock launcher this script knows." >&2
+          echo "  android                                  = Android's launcher chooser (two launchers tie); pick a default on the TV first" >&2
+          echo "  com.google.android.tungsten.setupwraith  = Google TV's setup wizard; see README, Troubleshooting" >&2
+          echo "  anything else                            = another launcher is the default" >&2
+          echo "Run again with STOCK_LAUNCHER=<package to disable> or STOCK_LAUNCHER=none." >&2; exit 1
+        fi ;;
+    esac
+  fi
 fi
 echo "Stock launcher: $STOCK_LAUNCHER"
 HOME_QUERY='cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME'
@@ -130,12 +141,38 @@ if ! printf '%s' "$START_OUT" | grep -qF 'Status: ok' || printf '%s' "$START_OUT
   echo "ERROR: the new launcher did not start (see above); $STOCK_LAUNCHER was left enabled." >&2
   exit 1
 fi
-printf '%s\n' \
-  "pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION 2>/dev/null; echo location-granted" \
-  "cmd package compile -m speed -f com.gathin.tvhome" \
-  "$DISABLE_STOCK" \
-  "cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity" \
-  | "$PY" -I ../tools/tv.py --batch
+if [ "$IS_FIRE_TV" -eq 1 ]; then
+  HOME_ON_FIRE_DIR="../home-on-fire"
+  if [ -d "$HOME_ON_FIRE_DIR" ]; then
+    if [ ! -f "$HOME_ON_FIRE_DIR/home-on-fire.apk" ] && [ -x "$HOME_ON_FIRE_DIR/build.sh" ]; then
+      echo "Building Home on Fire companion APK..."
+      (cd "$HOME_ON_FIRE_DIR" && ./build.sh >/dev/null 2>&1 || true)
+    fi
+    if [ -f "$HOME_ON_FIRE_DIR/home-on-fire.apk" ]; then
+      echo "Installing Home on Fire companion..."
+      "$PY" -I ../tools/b64push.py "$HOME_ON_FIRE_DIR/home-on-fire.apk" /data/local/tmp/homeonfire.apk
+      "$PY" -I ../tools/tv.py 'pm install -r /data/local/tmp/homeonfire.apk; rm -f /data/local/tmp/homeonfire.apk'
+    fi
+  fi
+  printf '%s\n' \
+    "pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION 2>/dev/null; echo location-granted" \
+    "pm grant com.gathin.tvhome android.permission.WRITE_SECURE_SETTINGS 2>/dev/null; echo secure-settings-tvhome-granted" \
+    "pm grant io.github.toolicious.homeonfire android.permission.WRITE_SECURE_SETTINGS 2>/dev/null; echo secure-settings-homeonfire-granted" \
+    "cmd appops set com.gathin.tvhome AUTO_START allow 2>/dev/null; cmd appops set com.gathin.tvhome APP_AUTO_START allow 2>/dev/null" \
+    "cmd appops set io.github.toolicious.homeonfire AUTO_START allow 2>/dev/null; cmd appops set io.github.toolicious.homeonfire APP_AUTO_START allow 2>/dev/null" \
+    "appops write-settings 2>/dev/null" \
+    "cmd package compile -m speed -f com.gathin.tvhome" \
+    "cmd package compile -m speed -f io.github.toolicious.homeonfire 2>/dev/null" \
+    's=$(settings get secure enabled_accessibility_services); for svc in io.github.toolicious.homeonfire/.HijackService com.gathin.tvhome/.HomeKeyService; do case "$s" in *"$svc"*) ;; null|"") s="$svc" ;; *) s="$s:$svc" ;; esac; done; settings put secure enabled_accessibility_services "$s"; settings put secure accessibility_enabled 1; echo accessibility-configured' \
+    | "$PY" -I ../tools/tv.py --batch
+else
+  printf '%s\n' \
+    "pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION 2>/dev/null; echo location-granted" \
+    "cmd package compile -m speed -f com.gathin.tvhome" \
+    "$DISABLE_STOCK" \
+    "cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity" \
+    | "$PY" -I ../tools/tv.py --batch
+fi
 
 # Home's owner, or an empty string when the TV cannot be reached (pipefail would otherwise make a
 # lost connection abort the script with no explanation).
@@ -176,22 +213,26 @@ rollback_home() {
 # on Google TV 14 the next candidate is the setup wizard's RecoveryActivity, which crash-loops
 # system_server (see examples/xiaomi-tv-a-pro-2026). So check where Home ended up, and put the
 # stock launcher back if it is not ours.
-HOME_NOW=$(query_home)
-case "$HOME_NOW" in
-  com.gathin.tvhome/*) echo "Home now resolves to $HOME_NOW" ;;
-  *)
-    if [ -z "$HOME_NOW" ]; then
-      echo "ERROR: the TV stopped answering while Home was being switched, so the outcome is unknown." >&2
-    else
-      echo "ERROR: Home resolves to $HOME_NOW, not to the new launcher." >&2
-    fi
-    rollback_home || true
-    if [ -n "$HOME_NOW" ]; then
-      echo "On Google TV this usually means com.google.android.tungsten.setupwraith also claims Home: add it to" >&2
-      echo "your debloat list (see README, Troubleshooting), apply the list, then run this script again." >&2
-    fi
-    exit 1 ;;
-esac
+if [ "$IS_FIRE_TV" -eq 1 ]; then
+  echo "Fire TV: CleanMyTV and Home on Fire installed and configured as pure clean TV."
+else
+  HOME_NOW=$(query_home)
+  case "$HOME_NOW" in
+    com.gathin.tvhome/*) echo "Home now resolves to $HOME_NOW" ;;
+    *)
+      if [ -z "$HOME_NOW" ]; then
+        echo "ERROR: the TV stopped answering while Home was being switched, so the outcome is unknown." >&2
+      else
+        echo "ERROR: Home resolves to $HOME_NOW, not to the new launcher." >&2
+      fi
+      rollback_home || true
+      if [ -n "$HOME_NOW" ]; then
+        echo "On Google TV this usually means com.google.android.tungsten.setupwraith also claims Home: add it to" >&2
+        echo "your debloat list (see README, Troubleshooting), apply the list, then run this script again." >&2
+      fi
+      exit 1 ;;
+  esac
+fi
 
 # Optional accessibility services. Off unless asked for, and Android switches them off again on
 # every reinstall, so pass the flag each time you run this script.

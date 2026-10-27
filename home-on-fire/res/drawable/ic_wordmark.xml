@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    CleanMyTV minimalist Apple TV style icon + FireTV wordmark.
+    Replaces Home on Fire branding with a sleek, premium TV logo.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="382dp"
+    android:height="200dp"
+    android:viewportWidth="1528"
+    android:viewportHeight="800">
+
+    <!-- Minimalist Apple TV style screen outline -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="24"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 280,260 L 520,260 C 536,260 550,274 550,290 L 550,470 C 550,486 536,500 520,500 L 280,500 C 264,500 250,486 250,470 L 250,290 C 250,274 264,260 280,260 Z" />
+
+    <!-- Sleek TV stand base -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="22"
+        android:strokeLineCap="round"
+        android:pathData="M 360,500 L 360,540 M 320,540 L 480,540" />
+
+    <!-- Minimalist screen inner accent -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 370,350 L 435,385 L 370,420 Z" />
+
+    <!-- Modern bold "FireTV" Typography -->
+    <!-- 'F' -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 620,300 H 710 V 338 H 662 V 378 H 702 V 416 H 662 V 495 H 620 Z" />
+
+    <!-- 'i' -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 735,300 H 775 V 338 H 735 Z M 735,358 H 775 V 495 H 735 Z" />
+
+    <!-- 'r' -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 800,358 H 838 V 390 C 848,368 865,358 888,358 C 895,358 902,360 908,362 V 405 C 898,400 888,398 878,398 C 855,398 838,414 838,442 V 495 H 800 Z" />
+
+    <!-- 'e' -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 975,432 H 928 C 930,455 944,466 965,466 C 976,466 986,462 994,455 L 1018,482 C 1004,495 984,502 962,502 C 920,502 890,468 890,428 C 890,388 920,355 962,355 C 1002,355 1025,385 1025,428 C 1025,430 1025,431 1025,432 Z M 928,408 H 986 C 984,390 974,382 960,382 C 946,382 932,390 928,408 Z" />
+
+    <!-- 'T' (Orange Accent) -->
+    <path
+        android:fillColor="#FFFF9E3D"
+        android:pathData="M 1045,300 H 1150 V 340 H 1118 V 495 H 1076 V 340 H 1045 Z" />
+
+    <!-- 'V' (Orange Accent) -->
+    <path
+        android:fillColor="#FFFF9E3D"
+        android:pathData="M 1155,300 H 1200 L 1238,440 L 1276,300 H 1320 L 1262,495 H 1214 Z" />
+
+</vector>
