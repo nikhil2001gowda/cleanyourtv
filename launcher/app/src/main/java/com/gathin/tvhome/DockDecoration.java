@@ -85,7 +85,9 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
         int pos = parent.getChildAdapterPosition(view);
         if (pos >= 0 && (singleRow || pos < dockSize)) {
             outRect.top = (int) (6 * density);
-            outRect.bottom = (int) ((bandAll && !singleRow ? 14 : 12) * density);
+            outRect.bottom = (int) ((bandAll && !singleRow ? 46 : 12) * density);
+        } else if (bandAll) {
+            outRect.bottom = (int) (10 * density);
         }
     }
 
@@ -128,7 +130,7 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
                     rect.union(l, t, r, b);
                 }
             } else if (bandAll && pos < totalApps && !hasUnder) {
-                underRowH = child.getHeight();
+                underRowH = child.getHeight() + (int) (10 * density);
                 anyUnderTop = child.getTop();
                 anyUnderRow = (pos - dockSize) / dockSize;
                 hasUnder = true;
