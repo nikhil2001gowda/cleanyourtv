@@ -7,7 +7,6 @@ import android.app.ActivityManager;
 import android.app.Dialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothProfile;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -1056,10 +1055,18 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         return true;
     }
 
+    private void openLauncherSettings() {
+        startActivityForResult(new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
+    }
+
+    private void openNativeSettings() {
+        open(systemIntent(Settings.ACTION_SETTINGS));
+    }
+
     private boolean openLauncherSettingsIfAsked(Intent intent) {
         if (intent == null || !ACTION_LAUNCHER_SETTINGS.equals(intent.getAction())) return false;
         setIntent(new Intent(Intent.ACTION_MAIN));
-        startActivityForResult(new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
+        openLauncherSettings();
         return true;
     }
 
@@ -3363,23 +3370,25 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnBluetooth.setCompoundDrawableTintList(ColorStateList.valueOf(0xFF0A84FF));
     }
 
-    @android.annotation.SuppressLint("MissingPermission")
+    @android.annotation.SuppressLint({"MissingPermission", "WrongConstant"})
     private boolean isBluetoothConnected() {
         try {
-            BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-            return adapter != null && adapter.isEnabled() && (adapter.getProfileConnectionState(BluetoothProfile.A2DP) == BluetoothAdapter.STATE_CONNECTED
-                    || adapter.getProfileConnectionState(BluetoothProfile.HEADSET) == BluetoothAdapter.STATE_CONNECTED
-                    || adapter.getProfileConnectionState(4) == BluetoothAdapter.STATE_CONNECTED);
-        } catch (Throwable ignored) {}
-        return false;
+            BluetoothAdapter a = BluetoothAdapter.getDefaultAdapter();
+            return a != null && a.isEnabled() && (a.getProfileConnectionState(2) == 2
+                    || a.getProfileConnectionState(1) == 2 || a.getProfileConnectionState(4) == 2);
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     private void openBluetoothSettings() {
-        Intent i = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
-        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        try {
-            startActivity(i);
-        } catch (Exception e) {
+        boolean fire = isFireTv();
+        Intent i = new Intent().setClassName(fire ? "com.amazon.tv.settings.v2" : "com.android.tv.settings",
+                fire ? "com.amazon.tv.settings.v2.tv.controllers_bluetooth_devices.ControllersAndBluetoothActivity"
+                        : "com.android.tv.settings.accessories.AddAccessoryActivity");
+        if (getPackageManager().resolveActivity(i, 0) != null) {
+            open(i);
+        } else {
             open(systemIntent(Settings.ACTION_BLUETOOTH_SETTINGS));
         }
     }
@@ -3396,9 +3405,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     private void optimizeRam(boolean notify) {
-        long before = 0;
         long[] mBefore = memUsedOfTotalMb();
-        if (mBefore != null) before = mBefore[0];
+        long before = mBefore != null ? mBefore[0] : 0;
 
         try {
             if (grid != null && grid.getRecycledViewPool() != null) grid.getRecycledViewPool().clear();
@@ -3413,7 +3421,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (btnRam != null) btnRam.setText(newPct + "%");
             if (notify) {
                 long freed = Math.max(0, before - mAfter[0]);
-                Toast.makeText(this, "Memory optimized" + (freed > 0 ? " (" + freed + " MB freed)" : ""), Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, freed > 0 ? "Freed " + freed + " MB" : "Memory optimized", Toast.LENGTH_SHORT).show();
             }
         }
     }
@@ -3429,17 +3437,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      * rather than an integrated television display with physical input ports.
      */
     static boolean isStreamingStickOrBox(Context ctx) {
-        // 1. ro.hdmi.device_type: 4 is Playback (dongle/stick/STB), 0 is TV (integrated television)
-        String hdmiType = getSystemProperty("ro.hdmi.device_type");
-        if ("4".equals(hdmiType)) return true;
-
-        // 2. Fire TV specific hardware models & features
-        String mfg = Build.MANUFACTURER != null ? Build.MANUFACTURER : "";
-        String model = Build.MODEL != null ? Build.MODEL.toUpperCase(Locale.ROOT) : "";
-        if ("Amazon".equalsIgnoreCase(mfg) || model.startsWith("AFT")) {
-            return true;
-        }
-        return false;
+        return "4".equals(getSystemProperty("ro.hdmi.device_type")) || isFireTv();
     }
 
     private static String getSystemProperty(String key) {
@@ -3849,29 +3847,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     private View addInputRow(LinearLayout rows, PopupWindow popup, int iconRes, String title, int state, Runnable action) {
-        View row = getLayoutInflater().inflate(R.layout.item_input, rows, false);
-        ((ImageView) row.findViewById(R.id.icon)).setImageResource(iconRes);
-        ((TextView) row.findViewById(R.id.title)).setText(title);
-        TextView status = row.findViewById(R.id.status);
-        View dot = row.findViewById(R.id.dot);
-        // This TV reports "standby" for every port whether or not something is plugged in, so only
-        // definite states are shown.
-        if (state == TvInputManager.INPUT_STATE_CONNECTED) {
-            status.setText(R.string.connected);
-            dot.setVisibility(View.VISIBLE);
-        } else if (state == TvInputManager.INPUT_STATE_DISCONNECTED) {
-            status.setText(R.string.not_connected);
-            dot.setVisibility(View.GONE);
-        } else {
-            status.setVisibility(View.GONE);
-            dot.setVisibility(View.GONE);
-        }
-        row.setOnClickListener(v -> {
-            popup.dismiss();
-            action.run();
-        });
-        rows.addView(row);
-        return row;
+        String status = state == TvInputManager.INPUT_STATE_CONNECTED ? getString(R.string.connected)
+                : state == TvInputManager.INPUT_STATE_DISCONNECTED ? getString(R.string.not_connected) : null;
+        return addPanelRow(rows, popup, iconRes, title, status, state == TvInputManager.INPUT_STATE_CONNECTED, action);
     }
 
     // ---- launcher settings and module cards -------------------------------------------------------
@@ -3889,11 +3867,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
             addInputRow(rows, popup, R.drawable.ic_swap_vert, getString(R.string.reorder), -1, this::toggleReorder);
             if (launcherSettingsButton) {
-                addInputRow(rows, popup, R.drawable.ic_home_settings_pill, getString(R.string.launcher_settings), -1,
-                        () -> startActivityForResult(new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST));
+                addInputRow(rows, popup, R.drawable.ic_home_settings_pill, getString(R.string.launcher_settings), -1, this::openLauncherSettings);
             } else {
-                addInputRow(rows, popup, R.drawable.ic_settings, getString(R.string.settings), -1,
-                        () -> open(systemIntent(Settings.ACTION_SETTINGS)));
+                addInputRow(rows, popup, R.drawable.ic_settings, getString(R.string.settings), -1, this::openNativeSettings);
             }
         });
     }
@@ -3906,14 +3882,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private static String getLocalIpAddress() {
         try {
-            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements();) {
-                NetworkInterface intf = en.nextElement();
+            for (NetworkInterface intf : Collections.list(NetworkInterface.getNetworkInterfaces())) {
                 if (intf.isLoopback() || !intf.isUp()) continue;
-                for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); enumIpAddr.hasMoreElements();) {
-                    InetAddress addr = enumIpAddr.nextElement();
-                    if (!addr.isLoopbackAddress() && addr instanceof Inet4Address) {
-                        return addr.getHostAddress();
-                    }
+                for (InetAddress addr : Collections.list(intf.getInetAddresses())) {
+                    if (!addr.isLoopbackAddress() && addr instanceof Inet4Address) return addr.getHostAddress();
                 }
             }
         } catch (Throwable ignored) {}
@@ -3972,7 +3944,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** Dropdown popup for the Wi-Fi pill: network details, signal info, and settings redirect. */
     private void showNetworkPanel() {
-        showPanel(findViewById(R.id.btnWifi), (rows, popup) -> {
+        showPanel(btnWifi, (rows, popup) -> {
             ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
             Network active = cm != null ? cm.getActiveNetwork() : null;
             NetworkCapabilities caps = active != null ? cm.getNetworkCapabilities(active) : null;
@@ -4018,25 +3990,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 int level = WifiManager.calculateSignalLevel(rssi, 5);
                 String signalQuality = level >= 4 ? "Excellent" : level >= 3 ? "Good" : level >= 2 ? "Fair" : "Weak";
 
-                StringBuilder details = new StringBuilder();
-                if (!band.isEmpty()) details.append(band);
-                if (speed > 0) {
-                    if (details.length() > 0) details.append(" • ");
-                    details.append(speed).append(" Mbps");
-                }
-                if (rssi != 0 && rssi != -127) {
-                    if (details.length() > 0) details.append(" (").append(signalQuality).append(")");
-                }
-                if (details.length() > 0) {
-                    addPanelRow(rows, popup, R.drawable.ic_wifi, "Signal & Speed", details.toString(), false, null);
-                }
+                String d = (band.isEmpty() ? "" : band)
+                        + (speed > 0 ? (band.isEmpty() ? "" : " • ") + speed + " Mbps" : "")
+                        + (rssi != 0 && rssi != -127 ? " (" + signalQuality + ")" : "");
+                if (!d.isEmpty()) addPanelRow(rows, popup, R.drawable.ic_wifi, "Signal & Speed", d, false, null);
             }
 
             addSeparator(rows);
 
             // 4. Redirect to Fire TV / System Wi-Fi settings
-            String settingsLabel = isFireTv() ? "Fire TV Network Settings" : "Wi-Fi Settings";
-            addPanelRow(rows, popup, R.drawable.ic_settings, settingsLabel, "Open", false, this::openNetworkPill);
+            addPanelRow(rows, popup, R.drawable.ic_settings, isFireTv() ? "Fire TV Network" : "Wi-Fi Settings", "Open", false, this::openNetworkPill);
 
             // 5. Refresh connection status
             addPanelRow(rows, popup, R.drawable.ic_swap_vert, "Refresh Status", "Check", false, this::updateWifiLabel);
@@ -4045,13 +4008,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** Dropdown popup for the Bluetooth pill: connected device details, type, and settings redirect. */
     private void showBluetoothPanel() {
-        showPanel(findViewById(R.id.btnBluetooth), (rows, popup) -> {
-            List<String> devs = getConnectedBluetoothDevices();
-            if (devs.isEmpty()) devs.add("Connected Device");
-            for (String dev : devs) {
+        showPanel(btnBluetooth, (rows, popup) -> {
+            for (String dev : getConnectedBluetoothDevices()) {
                 addPanelRow(rows, popup, R.drawable.ic_bluetooth, dev, "Connected", true, this::openBluetoothSettings);
             }
-            addSeparator(rows);
             addPanelRow(rows, popup, R.drawable.ic_settings, "Bluetooth Settings", "Open", false, this::openBluetoothSettings);
         });
     }
@@ -4064,20 +4024,15 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (adapter != null && adapter.isEnabled()) {
                 Set<BluetoothDevice> bonded = adapter.getBondedDevices();
                 if (bonded != null) {
-                    java.lang.reflect.Method isConn = null;
-                    try {
-                        isConn = BluetoothDevice.class.getMethod("isConnected");
-                    } catch (Throwable ignored) {}
+                    java.lang.reflect.Method m = null;
+                    try { m = BluetoothDevice.class.getMethod("isConnected"); } catch (Throwable ignored) {}
                     for (BluetoothDevice dev : bonded) {
-                        String name = dev.getName();
-                        if (name == null || name.isEmpty()) continue;
-                        boolean conn = isConn == null;
-                        if (isConn != null) {
-                            try {
-                                conn = Boolean.TRUE.equals(isConn.invoke(dev));
-                            } catch (Throwable ignored) {}
-                        }
-                        if (conn && !list.contains(name)) list.add(name);
+                        try {
+                            if (m == null || Boolean.TRUE.equals(m.invoke(dev))) {
+                                String n = dev.getName();
+                                if (n != null && !list.contains(n)) list.add(n);
+                            }
+                        } catch (Throwable ignored) {}
                     }
                 }
             }
@@ -4087,12 +4042,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** Dropdown popup for the VPN pill: active VPN info, secure tunnel status, and controls. */
     private void showVpnPanel() {
-        showPanel(findViewById(R.id.btnVpn), (rows, popup) -> {
+        showPanel(btnVpn, (rows, popup) -> {
             String appName = "VPN Connected";
             if (!vpnApp.isEmpty()) {
                 try {
-                    PackageManager pm = getPackageManager();
-                    appName = pm.getApplicationLabel(pm.getApplicationInfo(vpnApp, 0)).toString();
+                    appName = getPackageManager().getApplicationLabel(getPackageManager().getApplicationInfo(vpnApp, 0)).toString();
                 } catch (Throwable ignored) {}
             }
             addPanelRow(rows, popup, R.drawable.ic_lock, appName, "Encrypted", true, this::openVpnPill);
@@ -4102,20 +4056,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
             addSeparator(rows);
             addPanelRow(rows, popup, R.drawable.ic_settings, "VPN Settings", "Manage", false, this::openVpnPill);
-            addPanelRow(rows, popup, R.drawable.ic_swap_vert, "Refresh Status", "Check", false, this::updateWifiLabel);
         });
     }
 
     /** Dropdown popup for the Settings pill: CleanMyTV controls and system settings. */
     private void showSettingsPanel() {
         showPanel(findViewById(R.id.btnSettings), (rows, popup) -> {
-            addPanelRow(rows, popup, R.drawable.ic_home_settings_pill, getString(R.string.launcher_settings), "UI & UX", false, () -> {
-                startActivityForResult(new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
-            });
-            addPanelRow(rows, popup, R.drawable.ic_settings, getString(R.string.native_settings), "System", false, () -> {
-                Intent vendor = SystemSettings.vendorIntent(this);
-                open(vendor != null ? vendor : systemIntent(Settings.ACTION_SETTINGS));
-            });
+            addPanelRow(rows, popup, R.drawable.ic_home_settings_pill, getString(R.string.launcher_settings), "UI & UX", false, this::openLauncherSettings);
+            addPanelRow(rows, popup, R.drawable.ic_settings, getString(R.string.native_settings), "System", false, this::openNativeSettings);
             addPanelRow(rows, popup, R.drawable.ic_apps, "TV Home (Native)", "Switch", false, this::openStockLauncher);
             addSeparator(rows);
             addPanelRow(rows, popup, R.drawable.ic_swap_vert, getString(R.string.reorder), "Grid", false, this::toggleReorder);
@@ -4129,8 +4077,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         View panel = getLayoutInflater().inflate(R.layout.popup_inputs, root, false);
         LinearLayout rows = panel.findViewById(R.id.rows);
         PopupWindow popup = glassPopup(panel, (int) (200 * density));
-        if (!launcherSettingsButton) addSettingsMenuRow(rows, popup, R.string.launcher_settings, () -> startActivityForResult(
-                new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST));
+        if (!launcherSettingsButton) addSettingsMenuRow(rows, popup, R.string.launcher_settings, this::openLauncherSettings);
         // Firmware that ships its own settings app next to the AOSP one (Xiaomi China is one): the
         // vendor app holds pages the AOSP settings has no row for, such as Account & Security with
         // the ADB switch. Offered here only while one of them is installed.

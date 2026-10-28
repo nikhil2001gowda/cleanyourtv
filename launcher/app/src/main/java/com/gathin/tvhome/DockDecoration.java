@@ -85,7 +85,7 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
         int pos = parent.getChildAdapterPosition(view);
         if (pos >= 0 && (singleRow || pos < dockSize)) {
             outRect.top = (int) (6 * density);
-            outRect.bottom = (int) ((bandAll && !singleRow ? 36 : 12) * density);
+            outRect.bottom = (int) ((bandAll && !singleRow ? 14 : 12) * density);
         }
     }
 
@@ -154,9 +154,11 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
         int topAlpha = Math.max(4, Math.round(0x38 * opRatio));
         int botAlpha = Math.max(2, Math.round(0x14 * opRatio));
 
+        float dx = evenPadding ? even : side;
+        float dy = evenPadding ? even : pad;
+
         if (hasDock) {
-            if (evenPadding) rect.inset(-even, -even);
-            else rect.inset(singleRow ? -sidePad : -side, -pad);
+            rect.inset(singleRow && !evenPadding ? -sidePad : -dx, -dy);
             if (singleRow) {
                 rect.left = Math.max(rect.left, density);
                 rect.right = Math.min(rect.right, parent.getWidth() - density);
@@ -167,11 +169,8 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
 
         if (hasUnder && underRows > 0 && underRowH > 0) {
             float firstTop = anyUnderTop - anyUnderRow * underRowH;
-            float uTop = firstTop + cardTop;
-            float uBot = firstTop + (underRows - 1) * underRowH + cardTop + cardHeight;
-            rect.set(col0Left, uTop, colLastRight, uBot);
-            if (evenPadding) rect.inset(-even, -even);
-            else rect.inset(-side, -pad);
+            rect.set(col0Left, firstTop + cardTop, colLastRight, firstTop + (underRows - 1) * underRowH + cardTop + cardHeight);
+            rect.inset(-dx, -dy);
             rect.bottom += namesRoom;
             drawBand(c, rect, radius, topAlpha, botAlpha);
         }
