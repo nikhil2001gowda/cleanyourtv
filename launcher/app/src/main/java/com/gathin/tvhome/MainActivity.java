@@ -3,7 +3,11 @@ package com.gathin.tvhome;
 import android.animation.ArgbEvaluator;
 import android.animation.ValueAnimator;
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.app.Dialog;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothProfile;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -192,6 +196,22 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** config show_inputs_pill: false keeps the Inputs pill hidden even when the TV has inputs. */
     private boolean showInputsPill = true;
     private TextView btnWifi;
+    private TextView btnRam;
+    private TextView btnBluetooth;
+    private boolean btReceiverRegistered;
+    private final Runnable ramMonitor = new Runnable() {
+        @Override
+        public void run() {
+            updateRamPill();
+            handler.postDelayed(this, 30_000L);
+        }
+    };
+    private final BroadcastReceiver btReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            updateBluetoothPill();
+        }
+    };
     /** The network pill's icon as last set, so a refresh that changes nothing does not lay the top bar out again. */
     private int wifiIcon;
     /** The pills have been filled in once; later resumes refresh them after the first frame. */
@@ -832,6 +852,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
         btnInputs = findViewById(R.id.btnInputs);
         View btnSettings = findViewById(R.id.btnSettings);
+        btnRam = findViewById(R.id.btnRam);
+        btnBluetooth = findViewById(R.id.btnBluetooth);
+        if (btnRam != null) btnRam.setOnClickListener(v -> optimizeRam(true));
+        if (btnBluetooth != null) btnBluetooth.setOnClickListener(v -> openBluetoothSettings());
         btnInputs.setOnClickListener(v -> showInputs());
         btnWifi.setOnClickListener(v -> showNetworkPanel());
         btnVpn.setOnClickListener(v -> openVpnPill());
@@ -891,6 +915,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (cfg.wifiLabelWidth > 0) btnWifi.setMaxWidth(Math.round(cfg.wifiLabelWidth * density));
             else makeIconOnly(btnWifi);
             makeIconOnly((TextView) btnSettings);
+            if (btnBluetooth != null) makeIconOnly(btnBluetooth);
+            if (btnVpn != null) makeIconOnly(btnVpn);
+            if (btnRam != null) {
+                int p = Math.round(10 * density);
+                btnRam.setPaddingRelative(p, 0, Math.round(12 * density), 0);
+                btnRam.setCompoundDrawablePadding(Math.round(6 * density));
+                btnRam.setMaxWidth(Integer.MAX_VALUE);
+            }
         }
         if (cfg.iconOnlyInputs) makeIconOnly((TextView) btnInputs);
         btnSettings.setOnLongClickListener(v -> {
@@ -909,12 +941,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 focusTile(singleRow ? lastFocused : lastFocused % COLUMNS);
                 return true;
             }
-            int firstButton = btnInputs.getVisibility() == View.VISIBLE ? R.id.btnInputs : firstTopButton().getId();
+            int firstButton = (btnRam != null && btnRam.getVisibility() == View.VISIBLE) ? R.id.btnRam
+                    : (btnBluetooth != null && btnBluetooth.getVisibility() == View.VISIBLE) ? R.id.btnBluetooth
+                    : (btnInputs != null && btnInputs.getVisibility() == View.VISIBLE) ? R.id.btnInputs
+                    : firstTopButton().getId();
             int leftButton = rtlMenuBar ? R.id.btnSettings : firstButton;
             int rightButton = rtlMenuBar ? firstButton : R.id.btnSettings;
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return v.getId() == leftButton;
             return keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && v.getId() == rightButton;
         };
+        if (btnRam != null) btnRam.setOnKeyListener(pillKeys);
+        if (btnBluetooth != null) btnBluetooth.setOnKeyListener(pillKeys);
         btnInputs.setOnKeyListener(pillKeys);
         btnWifi.setOnKeyListener(pillKeys);
         btnVpn.setOnKeyListener(pillKeys);
@@ -923,7 +960,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnLibraryTop.setOnKeyListener(pillKeys);
         for (View button : topAppButtons) button.setOnKeyListener(pillKeys);
         if (advancedEffects) {
-            List<View> pills = new ArrayList<>(Arrays.asList(btnInputs, btnWifi, btnVpn, btnReorder, btnLibraryTop, btnSettings));
+            List<View> pills = new ArrayList<>();
+            if (btnRam != null) pills.add(btnRam);
+            if (btnBluetooth != null) pills.add(btnBluetooth);
+            pills.addAll(Arrays.asList(btnInputs, btnWifi, btnVpn, btnReorder, btnLibraryTop, btnSettings));
             pills.addAll(topAppButtons);
             for (View button : pills) {
                 button.setOnFocusChangeListener((view, focused) -> view.animate()
@@ -1275,6 +1315,20 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             pillsShown = true;
         }
         if (showStats) startStats();
+        updateRamPill();
+        handler.removeCallbacks(ramMonitor);
+        handler.postDelayed(ramMonitor, 30_000L);
+        updateBluetoothPill();
+        if (!btReceiverRegistered) {
+            try {
+                IntentFilter btFilter = new IntentFilter();
+                btFilter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
+                btFilter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+                btFilter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
+                registerReceiver(btReceiver, btFilter);
+                btReceiverRegistered = true;
+            } catch (Throwable ignored) {}
+        }
         if (gameDay != null) gameDay.start();
         sky.update();
         wallpaperPlayer.start();
@@ -1462,6 +1516,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         handler.removeCallbacks(openWhenOnline);
         startPending = null;   // leaving Home before the network came back: the boot's app stays closed
         stopStats();
+        handler.removeCallbacks(ramMonitor);
+        if (btReceiverRegistered) {
+            try {
+                unregisterReceiver(btReceiver);
+                btReceiverRegistered = false;
+            } catch (Throwable ignored) {}
+        }
         if (gameDay != null) gameDay.stop();
         handler.removeCallbacks(turnTick);
         if (diya != null) diya.stop();
@@ -3096,8 +3157,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         // With a VPN app configured, a VPN that is down matters too: show a red "VPN off" capsule then.
         boolean vpnDown = !vpn && online && !vpnApp.isEmpty();
-        if (vpnPill) updateVpnPill(vpn);
-        if ((vpn || vpnDown) && !vpnPill) {
+        updateVpnPill(vpn);
+        if (!vpn && vpnDown && !vpnPill) {
             // Network name, then the green lock-and-VPN (or red "VPN off") capsule drawn in place of the word.
             String badge = getString(vpn ? R.string.vpn : R.string.vpn_off);
             VpnBadge span = new VpnBadge(vpn ? getDrawable(R.drawable.ic_lock) : null, density);
@@ -3259,31 +3320,107 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         libraryFromVpnPill = true;
     }
 
-    /** vpn_pill: the pill outlined in green with a lock while a VPN is up, outlined in red "VPN off" while it is not;
-     *  solid with a white ring only while focused. */
+    /** VPN indicator: shown in top bar automatically whenever a VPN is detected, styled as a sleek frosted pill. */
     private void updateVpnPill(boolean vpn) {
-        int state = VpnBadge.pillState(vpn, vpnAppIntent() != null);
-        if (state == VpnBadge.PILL_HIDDEN) {
-            if (btnVpn.getVisibility() == View.GONE) return;
-            boolean focused = btnVpn.hasFocus();
-            btnVpn.setVisibility(View.GONE);
-            if (focused) (btnWifi.getVisibility() == View.VISIBLE ? btnWifi : firstTopButton()).requestFocus();
+        if (btnVpn == null) return;
+        if (!vpn) {
+            if (btnVpn.getVisibility() == View.VISIBLE) {
+                boolean focused = btnVpn.hasFocus();
+                btnVpn.setVisibility(View.GONE);
+                if (focused) (btnWifi.getVisibility() == View.VISIBLE ? btnWifi : firstTopButton()).requestFocus();
+            }
             return;
         }
-        if (state != vpnPillState) {
-            vpnPillState = state;
-            boolean up = state == VpnBadge.PILL_UP;
-            // The state colour at rest (the pill is an outline then), the contrasting ink on the solid focused fill.
-            ColorStateList ink = new ColorStateList(
-                    new int[][]{new int[]{android.R.attr.state_focused}, new int[0]},
-                    new int[]{VpnBadge.pillInkColor(up, true), VpnBadge.pillInkColor(up, false)});
-            btnVpn.setText(up ? R.string.vpn : R.string.vpn_off);
-            btnVpn.setTextColor(ink);
-            btnVpn.setBackground(VpnBadge.pillBackground(up, density));
-            btnVpn.setCompoundDrawablesRelativeWithIntrinsicBounds(up ? R.drawable.ic_lock : 0, 0, 0, 0);
-            btnVpn.setCompoundDrawableTintList(ink);
-        }
         btnVpn.setVisibility(View.VISIBLE);
+        if (iconOnlyButtons) {
+            makeIconOnly(btnVpn);
+        } else {
+            btnVpn.setText(R.string.vpn);
+        }
+        btnVpn.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_lock, 0, 0, 0);
+        btnVpn.setCompoundDrawableTintList(ColorStateList.valueOf(0xFF30D158));
+    }
+
+    /** Bluetooth indicator: shown in top bar automatically only if a Bluetooth device is connected. */
+    private void updateBluetoothPill() {
+        if (btnBluetooth == null) return;
+        boolean connected = isBluetoothConnected();
+        if (!connected) {
+            if (btnBluetooth.getVisibility() == View.VISIBLE) {
+                boolean focused = btnBluetooth.hasFocus();
+                btnBluetooth.setVisibility(View.GONE);
+                if (focused) (btnWifi.getVisibility() == View.VISIBLE ? btnWifi : firstTopButton()).requestFocus();
+            }
+            return;
+        }
+        btnBluetooth.setVisibility(View.VISIBLE);
+        if (iconOnlyButtons) {
+            makeIconOnly(btnBluetooth);
+        } else {
+            btnBluetooth.setText("BT");
+        }
+        btnBluetooth.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_bluetooth, 0, 0, 0);
+        btnBluetooth.setCompoundDrawableTintList(ColorStateList.valueOf(0xFF0A84FF));
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private boolean isBluetoothConnected() {
+        try {
+            BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+            if (adapter == null || !adapter.isEnabled()) return false;
+            int[] profiles = {BluetoothProfile.A2DP, BluetoothProfile.HEADSET, 4};
+            for (int p : profiles) {
+                try {
+                    if (adapter.getProfileConnectionState(p) == BluetoothAdapter.STATE_CONNECTED) return true;
+                } catch (Throwable ignored) {}
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    private void openBluetoothSettings() {
+        Intent i = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(i);
+        } catch (Exception e) {
+            open(systemIntent(Settings.ACTION_BLUETOOTH_SETTINGS));
+        }
+    }
+
+    /** RAM and CPU optimization and top bar RAM usage display. */
+    private void updateRamPill() {
+        if (btnRam == null) return;
+        long[] mem = memUsedOfTotalMb();
+        if (mem != null && mem[1] > 0) {
+            int pct = (int) Math.round(mem[0] * 100.0 / mem[1]);
+            btnRam.setText(pct + "%");
+            if (pct >= 82) optimizeRam(false);
+        }
+    }
+
+    private void optimizeRam(boolean notify) {
+        long before = 0;
+        long[] mBefore = memUsedOfTotalMb();
+        if (mBefore != null) before = mBefore[0];
+
+        try {
+            if (grid != null && grid.getRecycledViewPool() != null) grid.getRecycledViewPool().clear();
+            if (heroArtCache != null) heroArtCache.clear();
+        } catch (Throwable ignored) {}
+
+        System.gc();
+        Runtime.getRuntime().gc();
+
+        long[] mAfter = memUsedOfTotalMb();
+        if (mAfter != null && mAfter[1] > 0) {
+            int newPct = (int) Math.round(mAfter[0] * 100.0 / mAfter[1]);
+            if (btnRam != null) btnRam.setText(newPct + "%");
+            if (notify) {
+                long freed = Math.max(0, before - mAfter[0]);
+                Toast.makeText(this, "Memory optimized" + (freed > 0 ? " (" + freed + " MB freed)" : ""), Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
 

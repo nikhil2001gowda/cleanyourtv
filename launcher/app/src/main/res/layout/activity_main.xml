@@ -334,6 +334,24 @@
                 android:orientation="horizontal">
 
                 <TextView
+                    android:id="@+id/btnRam"
+                    style="@style/TopButton"
+                    android:singleLine="true"
+                    android:drawableStart="@drawable/ic_memory"
+                    android:text="--%"
+                    android:contentDescription="RAM Usage"
+                    android:nextFocusDown="@+id/grid" />
+
+                <TextView
+                    android:id="@+id/btnBluetooth"
+                    style="@style/TopButton"
+                    android:visibility="gone"
+                    android:singleLine="true"
+                    android:drawableStart="@drawable/ic_bluetooth"
+                    android:contentDescription="Bluetooth"
+                    android:nextFocusDown="@+id/grid" />
+
+                <TextView
                     android:id="@+id/btnInputs"
                     style="@style/TopButton"
                     android:text="@string/inputs"
@@ -355,6 +373,7 @@
                     style="@style/TopButton"
                     android:visibility="gone"
                     android:singleLine="true"
+                    android:drawableStart="@drawable/ic_lock"
                     android:text="@string/vpn"
                     android:nextFocusDown="@+id/grid" />
 
