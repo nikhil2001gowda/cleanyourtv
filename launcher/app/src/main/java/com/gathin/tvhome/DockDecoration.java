@@ -129,7 +129,8 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
             // The same padding on all four sides, so the band's corners are concentric with the tiles' everywhere.
             int inner = parent.getWidth() - parent.getPaddingLeft() - parent.getPaddingRight();
             // A single row's tiles can run off the screen, so only its top limits the padding; its ends are clamped below.
-            float room = (singleRow ? rect.top : Math.min(rect.top, Math.min(rect.left, parent.getWidth() - rect.right))) - density;
+            // In a grid, the dock never scrolls horizontally, so its side margins limit padding without shrinking as it scrolls vertically.
+            float room = (singleRow ? rect.top : Math.min(rect.left, parent.getWidth() - rect.right)) - density;
             float even = evenPaddingPx(inner, dockSize, cardWidth, room);
             rect.inset(-even, -even);
             radius = radiusPx(radius, even);
