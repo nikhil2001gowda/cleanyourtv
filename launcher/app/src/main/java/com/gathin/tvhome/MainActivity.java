@@ -3367,13 +3367,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean isBluetoothConnected() {
         try {
             BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-            if (adapter == null || !adapter.isEnabled()) return false;
-            int[] profiles = {BluetoothProfile.A2DP, BluetoothProfile.HEADSET, 4};
-            for (int p : profiles) {
-                try {
-                    if (adapter.getProfileConnectionState(p) == BluetoothAdapter.STATE_CONNECTED) return true;
-                } catch (Throwable ignored) {}
-            }
+            return adapter != null && adapter.isEnabled() && (adapter.getProfileConnectionState(BluetoothProfile.A2DP) == BluetoothAdapter.STATE_CONNECTED
+                    || adapter.getProfileConnectionState(BluetoothProfile.HEADSET) == BluetoothAdapter.STATE_CONNECTED
+                    || adapter.getProfileConnectionState(4) == BluetoothAdapter.STATE_CONNECTED);
         } catch (Throwable ignored) {}
         return false;
     }
@@ -3410,7 +3406,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         } catch (Throwable ignored) {}
 
         System.gc();
-        Runtime.getRuntime().gc();
 
         long[] mAfter = memUsedOfTotalMb();
         if (mAfter != null && mAfter[1] > 0) {
@@ -4058,7 +4053,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
             addSeparator(rows);
             addPanelRow(rows, popup, R.drawable.ic_settings, "Bluetooth Settings", "Open", false, this::openBluetoothSettings);
-            addPanelRow(rows, popup, R.drawable.ic_swap_vert, "Refresh Status", "Check", false, this::updateBluetoothPill);
         });
     }
 

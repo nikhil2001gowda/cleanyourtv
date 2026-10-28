@@ -26,13 +26,11 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
     private final boolean lightGlass;
     /** Padding all round the tiles equal to the gap between them (config.xml dock_even_padding). */
     private final boolean evenPadding;
-    /** The band's top and bottom the glass gradient was made for; it is remade when they move. */
-    private float shaderTop = Float.NaN, shaderBottom = Float.NaN;
     /** Draw the band and its edge (config.xml dock_band); false leaves the tiles floating on the wallpaper. */
     private final boolean bandVisible;
     /** single_row: the tiles after the dock share its row, so they take the same offsets to stay level with it. */
     private final boolean singleRow;
-    /** dock_band_all: in a single row, the band runs behind every app instead of the dock apps only. */
+    /** dock_band_all: the band runs behind every app instead of the dock apps only. */
     private final boolean bandAll;
     private final boolean translucent;
     private final int opacity;
@@ -45,13 +43,13 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
      * @param evenPadding the band's padding is the gap between the tiles on all four sides (dock_even_padding).
      * @param bandVisible false skips the band and its edge, so the tiles float on the wallpaper (dock_band).
      * @param singleRow   every app sits in the dock's row (single_row); the band covers the dock apps only, unless bandAll.
-     * @param bandAll     with singleRow, the band runs behind every app in the row (dock_band_all).
+     * @param bandAll     the band runs behind every app instead of the dock apps only (dock_band_all).
      */
     DockDecoration(int dockSize, float density, boolean translucent, boolean names, int opacity, boolean lightGlass,
                    boolean evenPadding, boolean bandVisible, boolean singleRow, boolean bandAll) {
         this.dockSize = dockSize;
         this.singleRow = singleRow;
-        this.bandAll = singleRow && bandAll;
+        this.bandAll = bandAll;
         this.translucent = translucent;
         this.density = density;
         this.namesRoom = names ? 22 * density : 0;
@@ -87,80 +85,101 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
         int pos = parent.getChildAdapterPosition(view);
         if (pos >= 0 && (singleRow || pos < dockSize)) {
             outRect.top = (int) (6 * density);
-            outRect.bottom = (int) (12 * density);
+            outRect.bottom = (int) ((bandAll && !singleRow ? 36 : 12) * density);
         }
     }
 
     @Override
     public void onDraw(@NonNull Canvas c, @NonNull RecyclerView parent, @NonNull RecyclerView.State state) {
         if (!bandVisible) return;
-        boolean any = false;
+        RecyclerView.Adapter<?> a = parent.getAdapter();
+        int totalApps = a instanceof AppAdapter ? ((AppAdapter) a).appCount() : dockSize;
+        int underCount = totalApps - dockSize;
+        int underRows = (underCount + dockSize - 1) / dockSize;
+
+        boolean hasDock = false;
+        boolean hasUnder = false;
         int cardWidth = 0;
+        float cardTop = 8 * density;
+        int underRowH = 0;
+        float anyUnderTop = 0;
+        int anyUnderRow = 0;
+
         for (int i = 0; i < parent.getChildCount(); i++) {
             View child = parent.getChildAt(i);
             int pos = parent.getChildAdapterPosition(child);
-            if (pos < 0 || (!bandAll && pos >= dockSize)) continue;
+            if (pos < 0) continue;
             RecyclerView.ViewHolder vh = parent.getChildViewHolder(child);
             View card = vh instanceof AppAdapter.Holder ? ((AppAdapter.Holder) vh).card : child.findViewById(R.id.card);
             if (card == null) continue;
+            cardWidth = card.getWidth();
+            cardTop = card.getTop();
             float l = child.getLeft() + card.getLeft();
-            float t = child.getTop() + card.getTop() + child.getTranslationY();
+            float t = child.getTop() + card.getTop();
             float r = l + card.getWidth();
             float b = t + card.getHeight();
-            cardWidth = card.getWidth();
-            if (!any) {
-                rect.set(l, t, r, b);
-                any = true;
-            } else {
-                rect.union(l, t, r, b);
+
+            if (pos < dockSize || singleRow) {
+                if (!hasDock) {
+                    rect.set(l, t, r, b);
+                    hasDock = true;
+                } else {
+                    rect.union(l, t, r, b);
+                }
+            } else if (bandAll && pos < totalApps && !hasUnder) {
+                underRowH = child.getHeight();
+                anyUnderTop = child.getTop();
+                anyUnderRow = (pos - dockSize) / dockSize;
+                hasUnder = true;
             }
         }
-        if (!any) return;
-        float pad = 14 * density;
-        // The band can only draw inside the grid, and the first and last dock tiles sit 12dp in from its
-        // edges: a full 14dp at the sides sliced the rounded ends flat (#454). Keep the sides, with the
-        // 1dp edge line, inside the grid; the top and bottom have room.
-        // 22dp at the sides (the grid's 10dp padding makes room): a focused first or last tile grows about 7dp
-        // outwards and still keeps about the band's top margin from its rounded end.
+        if (!hasDock && !hasUnder) return;
+
+        int inner = parent.getWidth() - parent.getPaddingLeft() - parent.getPaddingRight();
+        int colW = dockSize > 0 ? inner / dockSize : inner;
+        float col0Left = parent.getPaddingLeft() + (colW - cardWidth) / 2f;
+        float colLastRight = col0Left + (dockSize - 1) * colW + cardWidth;
+        float sideMargin = Math.min(col0Left, parent.getWidth() - colLastRight) - density;
+
+        float room = singleRow ? (hasDock ? rect.top - density : 0) : sideMargin;
+        float even = evenPadding ? evenPaddingPx(inner, dockSize, cardWidth, room) : 0f;
         float sidePad = 22 * density;
-        float side = Math.max(0f, Math.min(sidePad, Math.min(rect.left, parent.getWidth() - rect.right) - density));
+        float side = Math.max(0f, Math.min(sidePad, sideMargin));
+        float pad = 14 * density;
         float radius = AppAdapter.cornerRadius(cardWidth, density);
-        if (evenPadding) {
-            // The same padding on all four sides, so the band's corners are concentric with the tiles' everywhere.
-            int inner = parent.getWidth() - parent.getPaddingLeft() - parent.getPaddingRight();
-            // A single row's tiles can run off the screen, so only its top limits the padding; its ends are clamped below.
-            // In a grid, the dock never scrolls horizontally, so its side margins limit padding without shrinking as it scrolls vertically.
-            float room = (singleRow ? rect.top : Math.min(rect.left, parent.getWidth() - rect.right)) - density;
-            float even = evenPaddingPx(inner, dockSize, cardWidth, room);
-            rect.inset(-even, -even);
-            radius = radiusPx(radius, even);
-        } else {
-            // dock_even_padding off: the band as before, with its fixed 26 dp corners.
-            rect.inset(singleRow ? -sidePad : -side, -pad);
-            radius = 26 * density;
+        radius = evenPadding ? radiusPx(radius, even) : 26 * density;
+
+        float opRatio = opacity / 100f;
+        int topAlpha = Math.max(4, Math.round(0x38 * opRatio));
+        int botAlpha = Math.max(2, Math.round(0x14 * opRatio));
+
+        if (hasDock) {
+            if (evenPadding) rect.inset(-even, -even);
+            else rect.inset(singleRow ? -sidePad : -side, -pad);
+            if (singleRow) {
+                rect.left = Math.max(rect.left, density);
+                rect.right = Math.min(rect.right, parent.getWidth() - density);
+            }
+            rect.bottom += namesRoom;
+            drawBand(c, rect, radius, topAlpha, botAlpha);
         }
-        if (singleRow) {
-            // Tiles past the screen's edge: the band stops at the grid's edge with its rounded end instead of being
-            // sliced square there.
-            rect.left = Math.max(rect.left, density);
-            rect.right = Math.min(rect.right, parent.getWidth() - density);
+
+        if (hasUnder && underRows > 0 && underRowH > 0) {
+            float firstTop = anyUnderTop - anyUnderRow * underRowH;
+            rect.set(col0Left, firstTop + cardTop, colLastRight, firstTop + underRows * underRowH - cardTop);
+            if (evenPadding) rect.inset(-even, -even);
+            else rect.inset(-side, -pad);
+            drawBand(c, rect, radius, topAlpha, botAlpha);
         }
-        rect.bottom += namesRoom;
-        if (lightGlass && (rect.top != shaderTop || rect.bottom != shaderBottom)) {
-            float opRatio = opacity / 100f;
-            int topAlpha = Math.max(4, Math.round(0x38 * opRatio));
-            int botAlpha = Math.max(2, Math.round(0x14 * opRatio));
-            band.setShader(new LinearGradient(0, rect.top, 0, rect.bottom,
+    }
+
+    private void drawBand(Canvas c, RectF r, float rad, int topAlpha, int botAlpha) {
+        if (lightGlass) {
+            band.setShader(new LinearGradient(0, r.top, 0, r.bottom,
                     (topAlpha << 24) | 0x00FFFFFF, (botAlpha << 24) | 0x00FFFFFF,
                     Shader.TileMode.CLAMP));
-            shaderTop = rect.top;
-            shaderBottom = rect.bottom;
-        } else if (!lightGlass) {
-            band.setShader(null);
-            int alpha = Math.max(0, Math.min(255, Math.round(opacity * 2.55f)));
-            band.setColor((alpha << 24) | (translucent ? 0x121014 : 0x141416));
         }
-        c.drawRoundRect(rect, radius, radius, band);
-        c.drawRoundRect(rect, radius, radius, edge);
+        c.drawRoundRect(r, rad, rad, band);
+        c.drawRoundRect(r, rad, rad, edge);
     }
 }
