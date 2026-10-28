@@ -855,10 +855,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnRam = findViewById(R.id.btnRam);
         btnBluetooth = findViewById(R.id.btnBluetooth);
         if (btnRam != null) btnRam.setOnClickListener(v -> optimizeRam(true));
-        if (btnBluetooth != null) btnBluetooth.setOnClickListener(v -> openBluetoothSettings());
+        if (btnBluetooth != null) btnBluetooth.setOnClickListener(v -> showBluetoothPanel());
         btnInputs.setOnClickListener(v -> showInputs());
         btnWifi.setOnClickListener(v -> showNetworkPanel());
-        btnVpn.setOnClickListener(v -> openVpnPill());
+        btnVpn.setOnClickListener(v -> showVpnPanel());
         btnWifi.setOnLongClickListener(v -> {
             open(systemIntent(Settings.ACTION_WIFI_SETTINGS));
             return true;
@@ -3442,18 +3442,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         String mfg = Build.MANUFACTURER != null ? Build.MANUFACTURER : "";
         String model = Build.MODEL != null ? Build.MODEL.toUpperCase(Locale.ROOT) : "";
         if ("Amazon".equalsIgnoreCase(mfg) || model.startsWith("AFT")) {
-            // Known Fire TV sticks and media player dongles
-            if (model.equals("AFTM") || model.equals("AFTA") || model.equals("AFTMM")
-                    || model.equals("AFTSS") || model.equals("AFTSSS") || model.equals("AFTKA")
-                    || model.equals("AFTKM") || model.equals("AFTKRT") || model.equals("AFTB")
-                    || model.equals("AFTS") || model.equals("AFTN") || model.equals("AFTAHR")
-                    || model.equals("AFTR") || model.equals("AFTGAZL")) {
-                return true;
-            }
-            String prod = Build.PRODUCT != null ? Build.PRODUCT.toLowerCase(Locale.ROOT) : "";
-            if (prod.contains("stick") || prod.contains("dongle") || prod.contains("pendant")) {
-                return true;
-            }
+            return true;
         }
         return false;
     }
@@ -3894,31 +3883,24 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** top_menu: the gear's dropdown, standing in for the Inputs, Wi-Fi and Settings pills. */
     private void showTopMenu() {
-        View anchor = findViewById(R.id.btnSettings);
-        View panel = getLayoutInflater().inflate(R.layout.popup_inputs, root, false);
-        LinearLayout rows = panel.findViewById(R.id.rows);
-        PopupWindow popup = glassPopup(panel, (int) (220 * density));
-        // Inputs opens its own list once this one has closed.
-        if (showInputsMenuRow) addInputRow(rows, popup, R.drawable.ic_input, getString(R.string.inputs), -1, () -> root.post(this::showInputs));
-        addInputRow(rows, popup, R.drawable.ic_wifi, getString(R.string.quick_network), -1, () -> root.post(this::showNetworkPanel));
-        CharSequence network = wifiIconOnly ? btnWifi.getContentDescription() : btnWifi.getText();
-        if (!TextUtils.isEmpty(network)) {
-            TextView status = rows.getChildAt(rows.getChildCount() - 1).findViewById(R.id.status);
-            status.setText(network);
-            status.setVisibility(View.VISIBLE);
-        }
-        addInputRow(rows, popup, R.drawable.ic_swap_vert, getString(R.string.reorder), -1, this::toggleReorder);
-        if (launcherSettingsButton) {
-            addInputRow(rows, popup, R.drawable.ic_home_settings_pill, getString(R.string.launcher_settings), -1,
-                    () -> startActivityForResult(new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST));
-        } else {
-            addInputRow(rows, popup, R.drawable.ic_settings, getString(R.string.settings), -1,
-                    () -> open(systemIntent(Settings.ACTION_SETTINGS)));
-        }
-        panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-        popup.setWidth(Math.max((int) (220 * density), Math.min(panel.getMeasuredWidth(), (int) (360 * density))));
-        dropIn(popup, panel, anchor, getResources().getBoolean(R.bool.rtl_menu_bar) ? Gravity.START : Gravity.END);
-        rows.getChildAt(0).requestFocus();
+        showPanel(findViewById(R.id.btnSettings), (rows, popup) -> {
+            if (showInputsMenuRow) addInputRow(rows, popup, R.drawable.ic_input, getString(R.string.inputs), -1, () -> root.post(this::showInputs));
+            addInputRow(rows, popup, R.drawable.ic_wifi, getString(R.string.quick_network), -1, () -> root.post(this::showNetworkPanel));
+            CharSequence network = wifiIconOnly ? btnWifi.getContentDescription() : btnWifi.getText();
+            if (!TextUtils.isEmpty(network)) {
+                TextView status = rows.getChildAt(rows.getChildCount() - 1).findViewById(R.id.status);
+                status.setText(network);
+                status.setVisibility(View.VISIBLE);
+            }
+            addInputRow(rows, popup, R.drawable.ic_swap_vert, getString(R.string.reorder), -1, this::toggleReorder);
+            if (launcherSettingsButton) {
+                addInputRow(rows, popup, R.drawable.ic_home_settings_pill, getString(R.string.launcher_settings), -1,
+                        () -> startActivityForResult(new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST));
+            } else {
+                addInputRow(rows, popup, R.drawable.ic_settings, getString(R.string.settings), -1,
+                        () -> open(systemIntent(Settings.ACTION_SETTINGS)));
+            }
+        });
     }
 
     static boolean isFireTv() {
@@ -3971,90 +3953,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         return row;
     }
 
-    /** Dropdown popup for the Wi-Fi pill: network details, signal info, and settings redirect. */
-    private void showNetworkPanel() {
-        View anchor = findViewById(R.id.btnWifi);
+    private interface DropdownBuilder {
+        void build(LinearLayout rows, PopupWindow popup);
+    }
+
+    private void showPanel(View anchor, DropdownBuilder builder) {
+        if (anchor == null) return;
         View panel = getLayoutInflater().inflate(R.layout.popup_inputs, root, false);
         LinearLayout rows = panel.findViewById(R.id.rows);
-
-        int width = Math.max((int) (260 * density), anchor.getWidth());
-        PopupWindow popup = glassPopup(panel, width);
-
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-        Network active = cm != null ? cm.getActiveNetwork() : null;
-        NetworkCapabilities caps = active != null ? cm.getNetworkCapabilities(active) : null;
-        boolean online = caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
-        boolean validated = caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
-        boolean isEthernet = caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET);
-        boolean isWifi = caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
-
-        WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        WifiInfo info = wm != null ? wm.getConnectionInfo() : null;
-        String ssid = info != null ? info.getSSID() : null;
-        if (ssid != null) {
-            ssid = ssid.replace("\"", "").trim();
-            if (ssid.contains("unknown") || ssid.equals("0x") || ssid.isEmpty()) ssid = null;
-        }
-
-        String netName = isEthernet ? getString(R.string.ethernet)
-                : (isWifi && ssid != null) ? ssid
-                : isWifi ? getString(R.string.quick_network)
-                : getString(R.string.offline);
-        int netIcon = isEthernet ? R.drawable.ic_ethernet : R.drawable.ic_wifi;
-        String netStatus = !online ? getString(R.string.offline)
-                : validated ? "Connected • Online"
-                : getString(R.string.connected);
-
-        // 1. Current Network row (Clicking also opens Wi-Fi settings)
-        addPanelRow(rows, popup, netIcon, netName, netStatus, online, () -> open(systemIntent(Settings.ACTION_WIFI_SETTINGS)));
-
-        // 2. IP Address row
-        String ip = getLocalIpAddress();
-        if (ip != null) {
-            addPanelRow(rows, popup, R.drawable.ic_input, "IP Address", ip, false, null);
-        }
-
-        // 3. Wi-Fi Band & Signal Details
-        if (isWifi && info != null) {
-            int freq = info.getFrequency();
-            String band = (freq >= 4900 && freq < 5900) ? "5 GHz"
-                    : (freq >= 2400 && freq < 2500) ? "2.4 GHz"
-                    : (freq > 5900) ? "6 GHz" : "";
-            int speed = info.getLinkSpeed();
-            int rssi = info.getRssi();
-            int level = WifiManager.calculateSignalLevel(rssi, 5);
-            String signalQuality = level >= 4 ? "Excellent" : level >= 3 ? "Good" : level >= 2 ? "Fair" : "Weak";
-
-            StringBuilder details = new StringBuilder();
-            if (!band.isEmpty()) details.append(band);
-            if (speed > 0) {
-                if (details.length() > 0) details.append(" • ");
-                details.append(speed).append(" Mbps");
-            }
-            if (rssi != 0 && rssi != -127) {
-                if (details.length() > 0) details.append(" (").append(signalQuality).append(")");
-            }
-            if (details.length() > 0) {
-                addPanelRow(rows, popup, R.drawable.ic_wifi, "Signal & Speed", details.toString(), false, null);
-            }
-        }
-
-        addSeparator(rows);
-
-        // 4. Redirect to Fire TV / System Wi-Fi settings
-        String settingsLabel = isFireTv() ? "Fire TV Network Settings" : "Wi-Fi Settings";
-        addPanelRow(rows, popup, R.drawable.ic_settings, settingsLabel, "Open", false, this::openNetworkPill);
-
-        // 5. Refresh connection status
-        addPanelRow(rows, popup, R.drawable.ic_swap_vert, "Refresh Status", "Check", false, () -> {
-            updateWifiLabel();
-            Toast.makeText(this, "Network status refreshed", Toast.LENGTH_SHORT).show();
-        });
-
+        PopupWindow popup = glassPopup(panel, Math.max((int) (260 * density), anchor.getWidth()));
+        builder.build(rows, popup);
         panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
         popup.setWidth(Math.max((int) (260 * density), Math.min(panel.getMeasuredWidth(), (int) (360 * density))));
         dropIn(popup, panel, anchor, getResources().getBoolean(R.bool.rtl_menu_bar) ? Gravity.START : Gravity.END);
-
         for (int i = 0; i < rows.getChildCount(); i++) {
             View child = rows.getChildAt(i);
             if (child.isFocusable()) {
@@ -4064,47 +3975,158 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
     }
 
+    /** Dropdown popup for the Wi-Fi pill: network details, signal info, and settings redirect. */
+    private void showNetworkPanel() {
+        showPanel(findViewById(R.id.btnWifi), (rows, popup) -> {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            Network active = cm != null ? cm.getActiveNetwork() : null;
+            NetworkCapabilities caps = active != null ? cm.getNetworkCapabilities(active) : null;
+            boolean online = caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+            boolean validated = caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+            boolean isEthernet = caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET);
+            boolean isWifi = caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+
+            WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            WifiInfo info = wm != null ? wm.getConnectionInfo() : null;
+            String ssid = info != null ? info.getSSID() : null;
+            if (ssid != null) {
+                ssid = ssid.replace("\"", "").trim();
+                if (ssid.contains("unknown") || ssid.equals("0x") || ssid.isEmpty()) ssid = null;
+            }
+
+            String netName = isEthernet ? getString(R.string.ethernet)
+                    : (isWifi && ssid != null) ? ssid
+                    : isWifi ? getString(R.string.quick_network)
+                    : getString(R.string.offline);
+            int netIcon = isEthernet ? R.drawable.ic_ethernet : R.drawable.ic_wifi;
+            String netStatus = !online ? getString(R.string.offline)
+                    : validated ? "Connected • Online"
+                    : getString(R.string.connected);
+
+            // 1. Current Network row (Clicking also opens Wi-Fi settings)
+            addPanelRow(rows, popup, netIcon, netName, netStatus, online, () -> open(systemIntent(Settings.ACTION_WIFI_SETTINGS)));
+
+            // 2. IP Address row
+            String ip = getLocalIpAddress();
+            if (ip != null) {
+                addPanelRow(rows, popup, R.drawable.ic_input, "IP Address", ip, false, null);
+            }
+
+            // 3. Wi-Fi Band & Signal Details
+            if (isWifi && info != null) {
+                int freq = info.getFrequency();
+                String band = (freq >= 4900 && freq < 5900) ? "5 GHz"
+                        : (freq >= 2400 && freq < 2500) ? "2.4 GHz"
+                        : (freq > 5900) ? "6 GHz" : "";
+                int speed = info.getLinkSpeed();
+                int rssi = info.getRssi();
+                int level = WifiManager.calculateSignalLevel(rssi, 5);
+                String signalQuality = level >= 4 ? "Excellent" : level >= 3 ? "Good" : level >= 2 ? "Fair" : "Weak";
+
+                StringBuilder details = new StringBuilder();
+                if (!band.isEmpty()) details.append(band);
+                if (speed > 0) {
+                    if (details.length() > 0) details.append(" • ");
+                    details.append(speed).append(" Mbps");
+                }
+                if (rssi != 0 && rssi != -127) {
+                    if (details.length() > 0) details.append(" (").append(signalQuality).append(")");
+                }
+                if (details.length() > 0) {
+                    addPanelRow(rows, popup, R.drawable.ic_wifi, "Signal & Speed", details.toString(), false, null);
+                }
+            }
+
+            addSeparator(rows);
+
+            // 4. Redirect to Fire TV / System Wi-Fi settings
+            String settingsLabel = isFireTv() ? "Fire TV Network Settings" : "Wi-Fi Settings";
+            addPanelRow(rows, popup, R.drawable.ic_settings, settingsLabel, "Open", false, this::openNetworkPill);
+
+            // 5. Refresh connection status
+            addPanelRow(rows, popup, R.drawable.ic_swap_vert, "Refresh Status", "Check", false, this::updateWifiLabel);
+        });
+    }
+
+    /** Dropdown popup for the Bluetooth pill: connected device details, type, and settings redirect. */
+    private void showBluetoothPanel() {
+        showPanel(findViewById(R.id.btnBluetooth), (rows, popup) -> {
+            List<String> devs = getConnectedBluetoothDevices();
+            if (devs.isEmpty()) devs.add("Connected Device");
+            for (String dev : devs) {
+                addPanelRow(rows, popup, R.drawable.ic_bluetooth, dev, "Connected", true, this::openBluetoothSettings);
+            }
+            addSeparator(rows);
+            addPanelRow(rows, popup, R.drawable.ic_settings, "Bluetooth Settings", "Open", false, this::openBluetoothSettings);
+            addPanelRow(rows, popup, R.drawable.ic_swap_vert, "Refresh Status", "Check", false, this::updateBluetoothPill);
+        });
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private List<String> getConnectedBluetoothDevices() {
+        List<String> list = new ArrayList<>();
+        try {
+            BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+            if (adapter != null && adapter.isEnabled()) {
+                Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+                if (bonded != null) {
+                    java.lang.reflect.Method isConn = null;
+                    try {
+                        isConn = BluetoothDevice.class.getMethod("isConnected");
+                    } catch (Throwable ignored) {}
+                    for (BluetoothDevice dev : bonded) {
+                        String name = dev.getName();
+                        if (name == null || name.isEmpty()) continue;
+                        boolean conn = isConn == null;
+                        if (isConn != null) {
+                            try {
+                                conn = Boolean.TRUE.equals(isConn.invoke(dev));
+                            } catch (Throwable ignored) {}
+                        }
+                        if (conn && !list.contains(name)) list.add(name);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return list;
+    }
+
+    /** Dropdown popup for the VPN pill: active VPN info, secure tunnel status, and controls. */
+    private void showVpnPanel() {
+        showPanel(findViewById(R.id.btnVpn), (rows, popup) -> {
+            String appName = "VPN Connected";
+            if (!vpnApp.isEmpty()) {
+                try {
+                    PackageManager pm = getPackageManager();
+                    appName = pm.getApplicationLabel(pm.getApplicationInfo(vpnApp, 0)).toString();
+                } catch (Throwable ignored) {}
+            }
+            addPanelRow(rows, popup, R.drawable.ic_lock, appName, "Encrypted", true, this::openVpnPill);
+            String ip = getLocalIpAddress();
+            if (ip != null) {
+                addPanelRow(rows, popup, R.drawable.ic_input, "Protected IP", ip, false, null);
+            }
+            addSeparator(rows);
+            addPanelRow(rows, popup, R.drawable.ic_settings, "VPN Settings", "Manage", false, this::openVpnPill);
+            addPanelRow(rows, popup, R.drawable.ic_swap_vert, "Refresh Status", "Check", false, this::updateWifiLabel);
+        });
+    }
+
     /** Dropdown popup for the Settings pill: CleanMyTV controls and system settings. */
     private void showSettingsPanel() {
-        View anchor = findViewById(R.id.btnSettings);
-        View panel = getLayoutInflater().inflate(R.layout.popup_inputs, root, false);
-        LinearLayout rows = panel.findViewById(R.id.rows);
-
-        int width = Math.max((int) (260 * density), anchor.getWidth());
-        PopupWindow popup = glassPopup(panel, width);
-
-        // 1. CleanMyTV Launcher Settings
-        addPanelRow(rows, popup, R.drawable.ic_home_settings_pill, getString(R.string.launcher_settings), "UI & UX", false, () -> {
-            startActivityForResult(new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
+        showPanel(findViewById(R.id.btnSettings), (rows, popup) -> {
+            addPanelRow(rows, popup, R.drawable.ic_home_settings_pill, getString(R.string.launcher_settings), "UI & UX", false, () -> {
+                startActivityForResult(new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
+            });
+            addPanelRow(rows, popup, R.drawable.ic_settings, getString(R.string.native_settings), "System", false, () -> {
+                Intent vendor = SystemSettings.vendorIntent(this);
+                open(vendor != null ? vendor : systemIntent(Settings.ACTION_SETTINGS));
+            });
+            addPanelRow(rows, popup, R.drawable.ic_apps, "TV Home (Native)", "Switch", false, this::openStockLauncher);
+            addSeparator(rows);
+            addPanelRow(rows, popup, R.drawable.ic_swap_vert, getString(R.string.reorder), "Grid", false, this::toggleReorder);
+            addPanelRow(rows, popup, R.drawable.ic_input, "Optimize Memory", "Clean RAM", false, () -> optimizeRam(true));
         });
-
-        // 2. Native System Settings (Fire TV, Google TV, Android TV, Xiaomi)
-        addPanelRow(rows, popup, R.drawable.ic_settings, getString(R.string.native_settings), "System", false, () -> {
-            Intent vendor = SystemSettings.vendorIntent(this);
-            open(vendor != null ? vendor : systemIntent(Settings.ACTION_SETTINGS));
-        });
-
-        // 3. Switch to TV Home (Native) - compatible with Fire TV, Google TV, Android TV, and OEM sets
-        addPanelRow(rows, popup, R.drawable.ic_apps, "TV Home (Native)", "Switch", false, this::openStockLauncher);
-
-        addSeparator(rows);
-
-        // 5. Reorder Apps
-        addPanelRow(rows, popup, R.drawable.ic_swap_vert, getString(R.string.reorder), "Grid", false, this::toggleReorder);
-
-        // 6. Optimize System Memory
-        addPanelRow(rows, popup, R.drawable.ic_input, "Optimize Memory", "Clean RAM", false, () -> {
-            System.gc();
-            Toast.makeText(this, "Launcher memory optimized", Toast.LENGTH_SHORT).show();
-        });
-
-        panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-        popup.setWidth(Math.max((int) (260 * density), Math.min(panel.getMeasuredWidth(), (int) (360 * density))));
-        dropIn(popup, panel, anchor, getResources().getBoolean(R.bool.rtl_menu_bar) ? Gravity.START : Gravity.END);
-
-        if (rows.getChildCount() > 0) {
-            rows.getChildAt(0).requestFocus();
-        }
     }
 
     /** The header opens launcher settings directly; hold OK keeps the extra home actions available. */
