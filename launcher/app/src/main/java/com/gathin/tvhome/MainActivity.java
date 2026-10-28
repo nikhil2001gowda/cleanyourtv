@@ -145,6 +145,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private RecyclerView grid;
     private FrameLayout root;
     private WallpaperPlayer wallpaperPlayer;
+    private ImageView onlineWallpaperView;
+    private Bitmap onlineWallpaperBmp;
+    private OnlineWallpaperFetcher onlineWallpaperFetcher;
+    private boolean onlineWallpaperActive = false;
+    private boolean isOnlineWallpaperMode = false;
+    private boolean hasWallpaper = false;
+    private int currentFocusColor = 0xFF1E293B;
     private GlassView glass;
     private View ambient;
     private TextView heroName;
@@ -442,18 +449,72 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // the theme's background, so launch looks the same.
         getWindow().setBackgroundDrawable(null);
         wallpaperPlayer = new WallpaperPlayer(this, root, cfg);
+        SharedPreferences choices = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
+        String wpSource = choices.getString("wallpaper_source", "online");
+        isOnlineWallpaperMode = !"theme".equals(wpSource) && !"none".equals(wpSource) && cfg.wallpaperEnabled;
+        hasWallpaper = !"none".equals(wpSource) && cfg.wallpaperEnabled && (isOnlineWallpaperMode || !cfg.wallpapers.isEmpty());
+
         sky = findViewById(R.id.sky);
         sky.setIntensity(cfg.skyIntensity);
         glass = findViewById(R.id.glass);
         glass.setStyle(cfg.glassStyle);
         if (festive) glass.setAccent(festival.accentColor());
         ambient = findViewById(R.id.ambient);
-        // The glow is one bitmap, so its alpha can be applied while drawing it. Otherwise every frame of
-        // a fade renders it into a full-screen offscreen buffer first.
         ambient.forceHasOverlappingRendering(false);
-        ambientGlow = cfg.ambientGlow;
+        ambientGlow = cfg.ambientGlow && !hasWallpaper;
         appGlow = cfg.appGlow;
-        if (!ambientGlow) ambient.setVisibility(View.GONE);
+        if (!ambientGlow || hasWallpaper || isOnlineWallpaperMode) {
+            ambient.setVisibility(View.GONE);
+            ambient.setAlpha(0f);
+        }
+        if (hasWallpaper || isOnlineWallpaperMode) {
+            sky.setVisibility(View.GONE);
+        }
+
+        if (isOnlineWallpaperMode) {
+            onlineWallpaperView = new ImageView(this);
+            onlineWallpaperView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            onlineWallpaperView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            int ambientIdx = root.indexOfChild(ambient);
+            root.addView(onlineWallpaperView, Math.max(0, ambientIdx + 1), new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+            boolean shuffle = !WallpaperRotation.ORDER_SEQUENTIAL.equals(cfg.wallpaperOrder);
+            long intervalMs = cfg.wallpaperRotationMinutes * 60_000L;
+            onlineWallpaperFetcher = new OnlineWallpaperFetcher(this, 1920, 1080,
+                    intervalMs, shuffle, new OnlineWallpaperFetcher.Callback() {
+                @Override
+                public void onWallpaperLoaded(Bitmap bitmap) {
+                    onlineWallpaperActive = true;
+                    Bitmap old = onlineWallpaperBmp;
+                    onlineWallpaperBmp = bitmap;
+                    onlineWallpaperView.setImageBitmap(bitmap);
+                    onlineWallpaperView.setVisibility(View.VISIBLE);
+                    onlineWallpaperView.setAlpha(0f);
+                    onlineWallpaperView.animate().alpha(1f).setDuration(500).start();
+                    // Wallpaper is active: turn off ambient gradient completely so wallpaper is untouched
+                    if (ambient != null) {
+                        ambient.animate().cancel();
+                        ambient.setVisibility(View.GONE);
+                        ambient.setAlpha(0f);
+                    }
+                    if (sky != null) sky.setVisibility(View.GONE);
+                    if (old != null && old != bitmap) {
+                        onlineWallpaperView.postDelayed(old::recycle, 600);
+                    }
+                }
+
+                @Override
+                public void onWallpaperFailed() {
+                    onlineWallpaperActive = false;
+                    // Keep ambient completely off so app selection gradient never touches wallpaper
+                    if (ambient != null) {
+                        ambient.setVisibility(View.GONE);
+                        ambient.setAlpha(0f);
+                    }
+                }
+            });
+        }
         heroName = findViewById(R.id.heroName);
         hero = findViewById(R.id.hero);
         // The hero is now a group (name, and the cinematic lines): without this every fade of the default
@@ -1159,6 +1220,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (showStats) startStats();
         sky.update();
         wallpaperPlayer.start();
+        if (onlineWallpaperFetcher != null) onlineWallpaperFetcher.start();
         handler.postDelayed(minuteTick, MINUTE_MS);
         if (festive && diya != null) {
             diya.start();
@@ -1332,6 +1394,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         root.removeCallbacks(showIdleClock);
         endReorder();   // Home or another app while reordering keeps the order so far
         wallpaperPlayer.stop();
+        if (onlineWallpaperFetcher != null) onlineWallpaperFetcher.stop();
         stopAmbientAnimation();
         hero.animate().cancel();
         ambient.animate().cancel();
@@ -1401,6 +1464,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         super.onDestroy();
         unregisterReceiver(packageReceiver);
         wallpaperPlayer.close();
+        if (onlineWallpaperFetcher != null) onlineWallpaperFetcher.stop();
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
         if (tim != null) tim.unregisterCallback(inputCallback);
@@ -1958,6 +2022,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private void showHero(int position, float dockTopInRoot) {
         String label = adapter.labelAt(position);
         int color = adapter.ambientColorAt(position);
+        currentFocusColor = color;
         boolean changed = !label.contentEquals(heroName.getText());
         fillHero(position, label);
         int heroH = hero.getHeight();
@@ -1967,7 +2032,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             heroH = hero.getMeasuredHeight();
         }
         float y = dockTopInRoot - 14 * density - 26 * density - heroH;
-        if (cinematic && heroArtAlpha > 0f) showHeroArt(position);
+        if (heroArt != null) heroArt.setVisibility(View.GONE);
 
         if (!animations || reducedMotion) {
             // Snap the shelf instead of sliding and fading it: each of those frames repaints the
@@ -1977,9 +2042,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             hero.setY(y);
             hero.setTranslationX(0f);
             hero.setAlpha(1f);
-            if (ambientGlow) {
+            if (!hasWallpaper && !isOnlineWallpaperMode && !onlineWallpaperActive && ambientGlow) {
+                ambient.setVisibility(View.VISIBLE);
                 setAmbient(color);
                 ambient.setAlpha(1f);
+            } else {
+                ambient.setVisibility(View.GONE);
+                ambient.setAlpha(0f);
             }
             heroShown = true;
             return;
@@ -1992,9 +2061,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             hero.setY(y);
             hero.setTranslationX(0f);
             hero.animate().alpha(1f).setDuration(260).start();
-            if (ambientGlow) {
+            if (!hasWallpaper && !isOnlineWallpaperMode && !onlineWallpaperActive && ambientGlow) {
+                ambient.setVisibility(View.VISIBLE);
                 setAmbient(color);
                 ambient.animate().alpha(1f).setDuration(600).start();
+            } else {
+                ambient.setVisibility(View.GONE);
+                ambient.setAlpha(0f);
             }
             heroShown = true;
         } else if (changed) {
@@ -2007,54 +2080,56 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 hero.setTranslationX(12 * density);
                 hero.animate().alpha(1f).translationX(0f).setDuration(200).start();
             }).start();
-            if (ambientGlow && advancedEffects) {
-                transitionAmbient(color);
-            } else if (ambientGlow && color != ambientColor) {
-                ambient.animate().alpha(0.35f).setDuration(200).withEndAction(() -> {
-                    setAmbient(color);
-                    ambient.animate().alpha(1f).setDuration(500).start();
-                }).start();
+            if (!hasWallpaper && !isOnlineWallpaperMode && !onlineWallpaperActive && ambientGlow) {
+                ambient.setVisibility(View.VISIBLE);
+                if (advancedEffects) {
+                    transitionAmbient(color);
+                } else if (color != ambientColor) {
+                    ambient.animate().alpha(0.35f).setDuration(200).withEndAction(() -> {
+                        setAmbient(color);
+                        ambient.animate().alpha(1f).setDuration(500).start();
+                    }).start();
+                }
+            } else {
+                ambient.setVisibility(View.GONE);
+                ambient.setAlpha(0f);
             }
         } else {
             hero.setY(y);
             // onPause cancels the fade-ins, and a second Home during one lands on the same tile, which starts none:
             // finish them, or the shelf and the glow stay dim until focus moves to another app.
             if (hero.getAlpha() < 1f) hero.animate().alpha(1f).setDuration(260).start();
-            if (ambientGlow && color == ambientColor && ambient.getAlpha() < 1f) {
+            if (!hasWallpaper && !isOnlineWallpaperMode && !onlineWallpaperActive && ambientGlow && color == ambientColor && ambient.getAlpha() < 1f) {
+                ambient.setVisibility(View.VISIBLE);
                 ambient.animate().alpha(1f).setDuration(600).start();
+            } else if (hasWallpaper || isOnlineWallpaperMode || onlineWallpaperActive) {
+                ambient.setVisibility(View.GONE);
+                ambient.setAlpha(0f);
             }
         }
     }
 
-    /** The shelf's text for this dock app: its name and, on the cinematic shelf, "Last opened" and the dots. */
+    /** The shelf's text for this dock app: clean name above the dock. */
     private void fillHero(int position, String label) {
         heroName.setText(label);
-        if (!cinematic) return;
-        updateHeroMeta(position);
-        updateHeroDots(position);
     }
 
     // ---- cinematic shelf -------------------------------------------------------------------------
 
     /**
-     * The parts that never change: a larger name, the meta line and the dots, the artwork and the scrim, at
+     * The parts that never change: a larger name, the artwork and the scrim, at
      * scrimPercent of its strength (cinematic_scrim). cinematic_art 0 leaves the artwork out, 0 percent the scrim.
      */
     private void setUpCinematicShelf(int scrimPercent) {
         heroName.setTextSize(TypedValue.COMPLEX_UNIT_SP, 68f);
         heroName.setLetterSpacing(-0.025f);
-        heroMeta.setVisibility(View.INVISIBLE);   // keeps its height, so the name does not jump when it fills in
-        heroDots.setVisibility(heroDotsShown ? View.VISIBLE : View.GONE);
-        heroArt.setVisibility(heroArtAlpha > 0f ? View.VISIBLE : View.GONE);
+        heroMeta.setVisibility(View.GONE);
+        heroDots.setVisibility(View.GONE);
+        heroArt.setVisibility(View.GONE);
         // One stretched bitmap: apply its alpha while drawing instead of through an offscreen buffer.
         heroArt.forceHasOverlappingRendering(false);
-        if (scrimPercent <= 0) return;   // cinematic_scrim 0: no scrim at all
         View scrim = findViewById(R.id.heroScrim);
-        Drawable shade = scrimDrawable();
-        // On the bitmap's paint, not the view: a view's alpha would draw the full screen through an offscreen buffer.
-        shade.setAlpha(scrimPercent * 255 / 100);
-        scrim.setBackground(shade);
-        scrim.setVisibility(View.VISIBLE);
+        if (scrim != null) scrim.setVisibility(View.GONE);
     }
 
     /**
@@ -2111,50 +2186,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         else heroArt.animate().alpha(heroArtAlpha).setDuration(reducedMotion ? Math.min(ms, Motion.REDUCED_MS) : ms).start();
     }
 
-    /** "Last opened yesterday, 9:40 PM", the time in white; nothing (but the same height) when it was never seen. */
     private void updateHeroMeta(int position) {
-        long when = LastOpened.get(this, adapter.packageAt(position));
-        if (when <= 0) {
-            heroMeta.setVisibility(View.INVISIBLE);
-            return;
-        }
-        String rel = LastOpened.describe(this, when);
-        String text = getString(R.string.last_opened, rel);
-        SpannableString line = new SpannableString(text);
-        int at = text.indexOf(rel);
-        if (at >= 0) line.setSpan(new ForegroundColorSpan(0xFFFFFFFF), at, at + rel.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        heroMeta.setText(line);
-        heroMeta.setVisibility(View.VISIBLE);
+        if (heroMeta != null) heroMeta.setVisibility(View.GONE);
     }
 
-    /** One dot per dock app, the focused one drawn long and white. Hebrew docks start on the right, so do the dots. */
     private void updateHeroDots(int position) {
-        if (!heroDotsShown) return;
-        int count = Math.min(adapter.dockFilled(), COLUMNS);
-        heroDots.setVisibility(count > 1 ? View.VISIBLE : View.INVISIBLE);
-        if (heroDots.getChildCount() != count) {
-            heroDots.removeAllViews();
-            for (int i = 0; i < count; i++) {
-                View dot = new View(this);
-                GradientDrawable bg = new GradientDrawable();
-                bg.setCornerRadius(3 * density);
-                dot.setBackground(bg);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams((int) (6 * density), (int) (6 * density));
-                if (i > 0) lp.leftMargin = (int) (6 * density);
-                heroDots.addView(dot, lp);
-            }
-        }
-        for (int i = 0; i < count; i++) {
-            View dot = heroDots.getChildAt(rtlAppGrid ? count - 1 - i : i);
-            boolean on = i == position;
-            ((GradientDrawable) dot.getBackground()).setColor(on ? 0xFFFFFFFF : 0x4DFFFFFF);
-            ViewGroup.LayoutParams lp = dot.getLayoutParams();
-            int w = (int) ((on ? 20 : 6) * density);
-            if (lp.width != w) {
-                lp.width = w;
-                dot.setLayoutParams(lp);
-            }
-        }
+        if (heroDots != null) heroDots.setVisibility(View.GONE);
     }
 
     /**
@@ -2165,6 +2202,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      * so changing apps neither repaints it on the CPU (about 11 ms) nor uploads it again.
      */
     private void setAmbient(int color) {
+        if (hasWallpaper || isOnlineWallpaperMode || onlineWallpaperActive || !ambientGlow) {
+            ambient.setVisibility(View.GONE);
+            ambient.setAlpha(0f);
+            return;
+        }
         if (color == ambientColor && ambient.getBackground() != null) return;
         ambientColor = color;
         BitmapDrawable glow = (BitmapDrawable) ambient.getBackground();
@@ -2213,6 +2255,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     private void transitionAmbient(int color) {
+        if (hasWallpaper || isOnlineWallpaperMode || onlineWallpaperActive || !ambientGlow) {
+            ambient.setVisibility(View.GONE);
+            ambient.setAlpha(0f);
+            return;
+        }
         // A rapid focus change continues from the colour actually displayed on screen.
         stopAmbientAnimation();
         ambient.animate().cancel();
@@ -2247,7 +2294,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         heroArt.animate().cancel();
         heroArt.setAlpha(0f);
         heroShown = false;
-        if (!ambientGlow) return;
+        if (!ambientGlow || hasWallpaper || onlineWallpaperActive || isOnlineWallpaperMode) {
+            ambient.setVisibility(View.GONE);
+            ambient.setAlpha(0f);
+            return;
+        }
         if (!animations || reducedMotion) {
             setAmbient(color);
             ambient.setAlpha(1f);

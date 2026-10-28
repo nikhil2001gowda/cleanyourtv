@@ -8,7 +8,7 @@
     "in.startv.hotstar",
     "org.videolan.vlc"
   ],
-  "columns": 6,
+  "columns": 5,
   "background_color": "#090C14",
   "wallpaper": true,
   "cinematic_home": true,

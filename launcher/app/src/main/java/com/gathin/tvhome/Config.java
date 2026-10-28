@@ -42,6 +42,7 @@ final class Config {
     static final String SETTINGS_NAME = "launcher_settings";
     static final String ROWS_BELOW_DOCK_KEY = "rows_below_dock";
     static final String WALLPAPER_CHOICE_KEY = "wallpaper_choice";
+    static final String THEME_PRESET_KEY = "theme_preset";
     static final String DOCK_OPACITY_KEY = "dock_opacity";
     /**
      * Counts the changes made in Launcher settings. Home remembers the count it was built with and rebuilds on
@@ -619,22 +620,208 @@ final class Config {
         if (chosenRows >= 0 && chosenRows <= 3) rowsBelow = chosenRows;
         animations = choices.getBoolean("animations", animations);
         advancedEffects = choices.getBoolean("advanced_effects", advancedEffects);
+        String themePreset = choices.getString(THEME_PRESET_KEY, "glass");
+        if ("light".equals(themePreset)) {
+            background = 0xFFF0F3F8;
+            headerWhite = false;
+            dockGlass = true;
+            glassStyle = "light";
+            appGlow = false;
+            cinematic = false;
+        } else if ("night".equals(themePreset)) {
+            background = 0xFF000000;
+            headerWhite = true;
+            dockGlass = false;
+            appGlow = true;
+            glowStyle = "horizon";
+            cinematic = true;
+        } else if ("dark".equals(themePreset)) {
+            background = 0xFF12141A;
+            headerWhite = true;
+            dockGlass = false;
+            glassStyle = "flat";
+            appGlow = true;
+            cinematic = true;
+        } else if ("glass".equals(themePreset)) {
+            background = 0xFF0A0E1A;
+            cinematic = true;
+            dockGlass = true;
+            glassStyle = "frosted";
+            appGlow = true;
+            glowStyle = "horizon";
+            dockEvenPadding = true;
+            iconOnlyButtons = true;
+            headerWhite = true;
+        } else if ("nature_calm".equals(themePreset)) {
+            if (!choices.contains("columns")) columns = 6;
+            if (!choices.contains(ROWS_BELOW_DOCK_KEY)) rowsBelow = 1;
+            background = 0xFF05070C;
+            dockGlass = true;
+            dockTitle = false;
+            dockEvenPadding = true;
+            iconOnlyButtons = true;
+            iconOnlyInputs = true;
+            ambientGlow = false;
+            appGlow = false;
+            fadeRows = true;
+            focusOvershoot = false;
+            advancedEffects = true;
+            cinematic = false;
+            headerWhite = true;
+        } else if ("retro".equals(themePreset)) {
+            background = 0xFF000000;
+            dockGlass = false;
+            dockBand = false;
+            glassStyle = "rim";
+            dockTitle = false;
+            fillDock = true;
+            if (!choices.contains("columns")) columns = 5;
+            ambientGlow = false;
+            appGlow = false;
+            iconOnlyButtons = true;
+            iconOnlyInputs = true;
+            wifiStatusColor = true;
+            tileMenu = true;
+            reducedMotion = true;
+            skyIntensity = 0;
+            cinematic = false;
+            headerWhite = true;
+        } else if ("ruska".equals(themePreset)) {
+            background = 0xFF07080D;
+            ambientGlow = false;
+            dockBand = true;
+            appGlow = true;
+            focusOvershoot = false;
+            headerWhite = true;
+            cinematic = true;
+        } else if ("aurora".equals(themePreset)) {
+            background = 0xFF070A14;
+            dockGlass = true;
+            appGlow = true;
+            glowStyle = "horizon";
+            skyIntensity = 45;
+            headerWhite = true;
+            cinematic = true;
+        } else if ("sweden".equals(themePreset)) {
+            if (!choices.contains("columns")) columns = 6;
+            if (!choices.contains(ROWS_BELOW_DOCK_KEY)) rowsBelow = 1;
+            background = 0xFF05070C;
+            cinematic = false;
+            dockTitle = false;
+            dockGlass = true;
+            dockEvenPadding = true;
+            iconOnlyButtons = true;
+            iconOnlyInputs = true;
+            ambientGlow = false;
+            appGlow = false;
+            fadeRows = true;
+            focusOvershoot = false;
+            advancedEffects = true;
+            headerWhite = true;
+        } else if ("six_columns".equals(themePreset)) {
+            if (!choices.contains("columns")) columns = 6;
+            if (!choices.contains(ROWS_BELOW_DOCK_KEY)) rowsBelow = 1;
+            background = 0xFF000000;
+            dockBand = true;
+            headerWhite = true;
+            cinematic = false;
+        } else if ("dussehra".equals(themePreset)) {
+            background = 0xFF120809;
+            dockGlass = true;
+            cinematic = true;
+            headerWhite = true;
+        } else if ("scenes".equals(themePreset)) {
+            background = 0xFF0A0E1A;
+            cinematic = true;
+            dockGlass = true;
+            headerWhite = true;
+        } else if ("default".equals(themePreset)) {
+            background = 0xFF000000;
+            if (!choices.contains("columns")) columns = 4;
+            if (!choices.contains(ROWS_BELOW_DOCK_KEY)) rowsBelow = 0;
+            cinematic = false;
+            dockGlass = false;
+            dockBand = true;
+            headerWhite = true;
+        }
+        for (CustomSwitchData.SwitchItem item : CustomSwitchData.ALL) {
+            if (choices.contains(item.key)) {
+                boolean val = choices.getBoolean(item.key, item.defaultVal);
+                switch (item.key) {
+                    case "cinematic_home": cinematic = val; break;
+                    case "dock_glass": dockGlass = val; break;
+                    case "dock_band": dockBand = val; break;
+                    case "dock_title": dockTitle = val; break;
+                    case "always_show_names": alwaysShowNames = val; break;
+                    case "app_glow": appGlow = val; break;
+                    case "ambient_glow": ambientGlow = val; break;
+                    case "fade_rows": fadeRows = val; break;
+                    case "focus_overshoot": focusOvershoot = val; break;
+                    case "reduced_motion": reducedMotion = val; break;
+                    case "icon_only_buttons": iconOnlyButtons = val; break;
+                    case "icon_only_inputs": iconOnlyInputs = val; break;
+                    case "show_network_pill": showNetworkPill = val; break;
+                    case "show_inputs_pill": showInputsPill = val; break;
+                    case "wifi_status_color": wifiStatusColor = val; break;
+                    case "show_greeting": showGreeting = val; break;
+                    case "date_below_clock": dateBelowClock = val; break;
+                    case "header_white": headerWhite = val; break;
+                    case "wallpaper_captions": wallpaperCaptions = val; break;
+                    case "wallpaper_true_color": wallpaperTrueColor = val; break;
+                    case "cinematic_dots": cinematicDots = val; break;
+                    case "tile_menu": tileMenu = val; break;
+                    case "uniform_tiles": uniformTiles = val; break;
+                    case "single_row": singleRow = val; break;
+                    case "clock_wallpaper": clockWallpaper = val; break;
+                    case "clock_glow": clockGlow = val; break;
+                }
+            }
+        }
         File wallpaper = dir != null ? new File(dir, WALLPAPER_NAME) : null;
         if (wallpaper != null && !(wallpaper.isFile() && wallpaper.length() > 0)) wallpaper = null;
+        File themeDir = dir != null ? new File(new File(dir, "themes"), themePreset.replace('_', '-')) : null;
+        if (wallpaper == null && themeDir != null && themeDir.isDirectory()) {
+            File themeWp = new File(themeDir, WALLPAPER_NAME);
+            if (themeWp.isFile() && themeWp.length() > 0) wallpaper = themeWp;
+        }
         // A theme can also switch the wallpaper off while the file is still there.
         boolean wallpaperEnabled = json == null || bool(json, "wallpaper", true);
         if (!wallpaperEnabled) wallpaper = null;
         int rotationMinutes = json == null ? 0 : integer(json, "wallpaper_rotation_minutes", 0, 0, 1440);
         int wallpaperDim = json == null ? 0 : integer(json, "wallpaper_dim", 0, 0, 90);
         int dockOpacity = json == null ? 100 : integer(json, "dock_opacity", 100, 30, 100);
+        if (!choices.contains(DOCK_OPACITY_KEY)) {
+            if ("nature_calm".equals(themePreset)) dockOpacity = 40;
+            else if ("sweden".equals(themePreset)) dockOpacity = 50;
+            else if ("ruska".equals(themePreset)) dockOpacity = 70;
+        }
         dockOpacity = chosenDockOpacity(choices.getInt(DOCK_OPACITY_KEY, -1), dockOpacity);
         String wallpaperOrder = json == null ? WallpaperRotation.ORDER_SHUFFLE
                 : string(json, "wallpaper_order", WallpaperRotation.ORDER_SHUFFLE);
         // An unknown order must not silently change how an existing collection rotates.
         if (!WallpaperRotation.validOrder(wallpaperOrder)) wallpaperOrder = WallpaperRotation.ORDER_SHUFFLE;
+        String wallpaperSource = choices.getString("wallpaper_source", null);
+        if ("none".equals(wallpaperSource)) {
+            wallpaperEnabled = false;
+        } else if ("online".equals(wallpaperSource) || "theme".equals(wallpaperSource)) {
+            wallpaperEnabled = true;
+        }
+        if (choices.contains("wallpaper_rotation_minutes")) {
+            int customMins = choices.getInt("wallpaper_rotation_minutes", -1);
+            if (customMins >= 0) rotationMinutes = customMins;
+        }
+        if (choices.contains("wallpaper_order")) {
+            String customOrder = choices.getString("wallpaper_order", null);
+            if (customOrder != null && WallpaperRotation.validOrder(customOrder)) {
+                wallpaperOrder = customOrder;
+            }
+        }
         List<File> wallpapers = new ArrayList<>();
         if (rotationMinutes > 0 && dir != null && wallpaperEnabled) {
             wallpapers.addAll(WallpaperRotation.images(new File(dir, "wallpapers")));
+        }
+        if (themeDir != null && themeDir.isDirectory() && wallpaperEnabled) {
+            wallpapers.addAll(WallpaperRotation.images(new File(themeDir, "wallpapers")));
         }
         if (wallpapers.isEmpty() && wallpaper != null) wallpapers.add(wallpaper);
         // An on-TV wallpaper pick overrides the theme: a filename from the wallpapers/
@@ -651,6 +838,9 @@ final class Config {
         // A festive skin comes only from a theme; config.xml has no festival.
         Festival festival = json == null ? Festival.NONE : Festival.parse(string(json, "festival", ""),
                 string(json, "festival_until", ""), string(json, "greeting", ""), string(json, "accent_color", ""));
+        if ("dussehra".equals(themePreset)) {
+            festival = Festival.parse("dussehra", "2026-10-21", "", "#FFB23C");
+        }
 
         return new Config(dock, fillDock, hidden, libraryApps, liveTv, liveTvAction, liveTvInputId, packageMap(launchActions), packageMap(appLabels),
                 packageMap(appBanners), panelService, panelAction, panelExtra, coocaaSources, inputAction, inputSources, inputUriScheme, Math.max(1, columns),
@@ -707,14 +897,52 @@ final class Config {
             // Existing preferences survive an app upgrade, unless the first launch follows an
             // explicit theme push or reset by the updated tools.
             SharedPreferences.Editor editor = choices.edit();
-            if (!"absent".equals(token)) editor.remove("columns").remove("animations")
-                    .remove("advanced_effects").remove(ROWS_BELOW_DOCK_KEY).remove(WALLPAPER_CHOICE_KEY)
-                    .remove(DOCK_OPACITY_KEY);
+            if (!"absent".equals(token)) {
+                editor.remove("columns").remove("animations").remove("advanced_effects")
+                        .remove(ROWS_BELOW_DOCK_KEY).remove(WALLPAPER_CHOICE_KEY).remove(DOCK_OPACITY_KEY);
+                for (CustomSwitchData.SwitchItem item : CustomSwitchData.ALL) editor.remove(item.key);
+            }
             editor.putString(THEME_SIGNATURE_KEY, signature).commit();
         } else if (!seen.equals(signature)) {
-            choices.edit().remove("columns").remove("animations").remove("advanced_effects")
-                    .remove(ROWS_BELOW_DOCK_KEY).remove(WALLPAPER_CHOICE_KEY).remove(DOCK_OPACITY_KEY)
-                    .putString(THEME_SIGNATURE_KEY, signature).commit();
+            SharedPreferences.Editor editor = choices.edit().remove("columns").remove("animations")
+                    .remove("advanced_effects").remove(ROWS_BELOW_DOCK_KEY).remove(WALLPAPER_CHOICE_KEY)
+                    .remove(DOCK_OPACITY_KEY);
+            for (CustomSwitchData.SwitchItem item : CustomSwitchData.ALL) editor.remove(item.key);
+            editor.putString(THEME_SIGNATURE_KEY, signature).commit();
+        }
+    }
+
+    /** Returns the resolved boolean value of any switch key for the given Config instance. */
+    static boolean getSwitchValue(Config config, String key) {
+        if (config == null || key == null) return false;
+        switch (key) {
+            case "cinematic_home": return config.cinematicHome;
+            case "dock_glass": return config.dockGlass;
+            case "dock_band": return config.dockBand;
+            case "dock_title": return config.dockTitle;
+            case "always_show_names": return config.alwaysShowNames;
+            case "app_glow": return config.appGlow;
+            case "ambient_glow": return config.ambientGlow;
+            case "fade_rows": return config.fadeRows;
+            case "focus_overshoot": return config.focusOvershoot;
+            case "reduced_motion": return config.reducedMotion;
+            case "icon_only_buttons": return config.iconOnlyButtons;
+            case "icon_only_inputs": return config.iconOnlyInputs;
+            case "show_network_pill": return config.showNetworkPill;
+            case "show_inputs_pill": return config.showInputsPill;
+            case "wifi_status_color": return config.wifiStatusColor;
+            case "show_greeting": return config.showGreeting;
+            case "date_below_clock": return config.dateBelowClock;
+            case "header_white": return config.headerWhite;
+            case "wallpaper_captions": return config.wallpaperCaptions;
+            case "wallpaper_true_color": return config.wallpaperTrueColor;
+            case "cinematic_dots": return config.cinematicDots;
+            case "tile_menu": return config.tileMenu;
+            case "uniform_tiles": return config.uniformTiles;
+            case "single_row": return config.singleRow;
+            case "clock_wallpaper": return config.clockWallpaper;
+            case "clock_glow": return config.clockGlow;
+            default: return false;
         }
     }
 

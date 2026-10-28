@@ -1,18 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/settings_bg"
-    android:fillViewport="true">
+    android:baselineAligned="false"
+    android:orientation="horizontal">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingStart="72dp"
-        android:paddingEnd="72dp"
-        android:paddingTop="38dp"
-        android:paddingBottom="38dp">
+    <ScrollView
+        android:layout_width="540dp"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="64dp"
+            android:paddingEnd="32dp"
+            android:paddingTop="38dp"
+            android:paddingBottom="48dp">
 
         <TextView
             android:layout_width="match_parent"
@@ -56,13 +63,15 @@
             android:layout_marginTop="18dp"
             android:text="@string/rows_below_dock_label"
             android:textColor="#FFFFFFFF"
-            android:textSize="20sp" />
+            android:textSize="20sp"
+            android:visibility="gone" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:visibility="gone">
 
             <TextView android:id="@+id/rows0" style="@style/SettingsColumnChoice" android:text="0" />
             <TextView android:id="@+id/rows1" style="@style/SettingsColumnChoice" android:text="1" />
@@ -91,9 +100,14 @@
         </LinearLayout>
 
         <TextView
-            android:id="@+id/wallpaperChoice"
+            android:id="@+id/themeChoice"
             style="@style/SettingsRow"
             android:layout_marginTop="28dp" />
+
+        <TextView
+            android:id="@+id/wallpaperChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="12dp" />
 
         <TextView
             android:id="@+id/animationsChoice"
@@ -112,6 +126,21 @@
             android:text="@string/advanced_effects_warning"
             android:textColor="#FFACB8C1"
             android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/customSwitchesChoice"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/settings_choice_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/custom_switches_title"
+            android:textColor="#FFFFFFFF"
+            android:textSize="18sp" />
 
         <TextView
             android:id="@+id/openOnStartChoice"
@@ -153,4 +182,84 @@
             android:layout_marginTop="18dp"
             android:text="@string/tv_settings" />
     </LinearLayout>
-</ScrollView>
+    </ScrollView>
+
+    <!-- Center Divider -->
+    <View
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:background="#14FFFFFF" />
+
+    <!-- Right: Apple tvOS Live Context & Preview Panel -->
+    <LinearLayout
+        android:id="@+id/settingsPreviewPane"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:paddingStart="40dp"
+        android:paddingEnd="48dp"
+        android:paddingTop="28dp"
+        android:paddingBottom="28dp">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_marginBottom="18dp"
+            android:background="@drawable/settings_choice_bg"
+            android:clipToOutline="true">
+
+            <com.gathin.tvhome.ThemePreviewView
+                android:id="@+id/settingsThemePreview"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <ImageView
+                android:id="@+id/settingsWallpaperPreview"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:visibility="gone"
+                android:importantForAccessibility="no" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/settingsPreviewTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@string/font_medium"
+            android:textColor="#FFFFFFFF"
+            android:textSize="24sp" />
+
+        <LinearLayout
+            android:id="@+id/settingsPreviewBadges"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="12dp"
+            android:orientation="horizontal" />
+
+        <TextView
+            android:id="@+id/settingsPreviewDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:lineSpacingExtra="3dp"
+            android:textColor="#FFACB8C1"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/settingsPreviewHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/pill_bg"
+            android:paddingStart="16dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="8dp"
+            android:text="@string/theme_preview_hint"
+            android:textColor="#FFE5F5EC"
+            android:textSize="13sp" />
+    </LinearLayout>
+</LinearLayout>

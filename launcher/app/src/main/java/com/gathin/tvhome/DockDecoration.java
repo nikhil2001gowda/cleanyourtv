@@ -34,6 +34,8 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
     private final boolean singleRow;
     /** dock_band_all: in a single row, the band runs behind every app instead of the dock apps only. */
     private final boolean bandAll;
+    private final boolean translucent;
+    private final int opacity;
 
     /**
      * @param translucent the cinematic shelf's band: the artwork and the glow show through it.
@@ -50,15 +52,19 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
         this.dockSize = dockSize;
         this.singleRow = singleRow;
         this.bandAll = singleRow && bandAll;
+        this.translucent = translucent;
         this.density = density;
         this.namesRoom = names ? 22 * density : 0;
         this.lightGlass = lightGlass;
         this.evenPadding = evenPadding;
         this.bandVisible = bandVisible;
-        band.setColor(translucent ? 0x8C121014 : (Math.round(opacity * 2.55f) << 24) | 0x141416);
+        this.opacity = opacity;
+        int alpha = Math.max(0, Math.min(255, Math.round(opacity * 2.55f)));
+        band.setColor((alpha << 24) | (translucent ? 0x121014 : 0x141416));
         edge.setStyle(Paint.Style.STROKE);
         edge.setStrokeWidth(density);
-        edge.setColor(lightGlass ? 0x38FFFFFF : translucent ? 0x26FFFFFF : 0x1FFFFFFF);
+        int edgeAlpha = Math.max(16, Math.min(255, Math.round(opacity * 0.7f)));
+        edge.setColor((edgeAlpha << 24) | 0x00FFFFFF);
     }
 
     /** Concentric corners: the band's radius is the tiles' radius plus the band's padding around them. */
@@ -140,11 +146,18 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
         }
         rect.bottom += namesRoom;
         if (lightGlass && (rect.top != shaderTop || rect.bottom != shaderBottom)) {
-            // The pills' glass (pill_bg: white, 18% fading to 8%), a little fainter over this much larger area.
-            band.setShader(new LinearGradient(0, rect.top, 0, rect.bottom, 0x24FFFFFF, 0x0DFFFFFF,
+            float opRatio = opacity / 100f;
+            int topAlpha = Math.max(4, Math.round(0x38 * opRatio));
+            int botAlpha = Math.max(2, Math.round(0x14 * opRatio));
+            band.setShader(new LinearGradient(0, rect.top, 0, rect.bottom,
+                    (topAlpha << 24) | 0x00FFFFFF, (botAlpha << 24) | 0x00FFFFFF,
                     Shader.TileMode.CLAMP));
             shaderTop = rect.top;
             shaderBottom = rect.bottom;
+        } else if (!lightGlass) {
+            band.setShader(null);
+            int alpha = Math.max(0, Math.min(255, Math.round(opacity * 2.55f)));
+            band.setColor((alpha << 24) | (translucent ? 0x121014 : 0x141416));
         }
         c.drawRoundRect(rect, radius, radius, band);
         c.drawRoundRect(rect, radius, radius, edge);

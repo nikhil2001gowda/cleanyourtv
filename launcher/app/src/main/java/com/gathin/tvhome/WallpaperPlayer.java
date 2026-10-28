@@ -92,7 +92,9 @@ final class WallpaperPlayer {
                 ? WallpaperCaptions.read(files.get(0).getParentFile()) : Collections.emptyMap();
         caption = names.isEmpty() ? null : makeCaption(context, root);
         if (config.wallpaperEnabled && !files.isEmpty()) {
-            root.addView(image, 0, new FrameLayout.LayoutParams(
+            View ambient = root.findViewById(R.id.ambient);
+            int idx = ambient != null ? root.indexOfChild(ambient) + 1 : 0;
+            root.addView(image, Math.max(0, idx), new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             showFirst();
         }
