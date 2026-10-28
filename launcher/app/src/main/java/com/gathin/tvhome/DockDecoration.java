@@ -99,7 +99,7 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
 
         boolean hasDock = false;
         boolean hasUnder = false;
-        int cardWidth = 0;
+        int cardWidth = 0, cardHeight = 0;
         float cardTop = 8 * density;
         int underRowH = 0;
         float anyUnderTop = 0;
@@ -113,6 +113,7 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
             View card = vh instanceof AppAdapter.Holder ? ((AppAdapter.Holder) vh).card : child.findViewById(R.id.card);
             if (card == null) continue;
             cardWidth = card.getWidth();
+            cardHeight = card.getHeight();
             cardTop = card.getTop();
             float l = child.getLeft() + card.getLeft();
             float t = child.getTop() + card.getTop();
@@ -166,9 +167,12 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
 
         if (hasUnder && underRows > 0 && underRowH > 0) {
             float firstTop = anyUnderTop - anyUnderRow * underRowH;
-            rect.set(col0Left, firstTop + cardTop, colLastRight, firstTop + underRows * underRowH - cardTop);
+            float uTop = firstTop + cardTop;
+            float uBot = firstTop + (underRows - 1) * underRowH + cardTop + cardHeight;
+            rect.set(col0Left, uTop, colLastRight, uBot);
             if (evenPadding) rect.inset(-even, -even);
             else rect.inset(-side, -pad);
+            rect.bottom += namesRoom;
             drawBand(c, rect, radius, topAlpha, botAlpha);
         }
     }
