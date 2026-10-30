@@ -278,17 +278,25 @@ public final class LauncherSettingsActivity extends Activity {
 
     private void showWallpaperPicker() {
         Dialog dialog = new Dialog(this, R.style.Theme_TvHome);
-        dialog.setContentView(R.layout.dialog_wallpaper_settings);
+        dialog.setContentView(R.layout.dialog_theme_picker);
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawable(new ColorDrawable(0xFA0B0E14));
         }
 
-        LinearLayout listContainer = dialog.findViewById(R.id.wpSettingsListContainer);
-        ImageView previewImage = dialog.findViewById(R.id.dialogWpPreviewImage);
-        TextView previewTitle = dialog.findViewById(R.id.dialogWpPreviewTitle);
-        LinearLayout previewBadges = dialog.findViewById(R.id.dialogWpPreviewBadges);
-        TextView previewDesc = dialog.findViewById(R.id.dialogWpPreviewDescription);
-        TextView applyPrompt = dialog.findViewById(R.id.dialogWpApplyPrompt);
+        TextView headerTitle = dialog.findViewById(R.id.dialogHeaderTitle);
+        headerTitle.setText(R.string.wallpaper_label);
+        TextView headerSub = dialog.findViewById(R.id.dialogHeaderSubtitle);
+        headerSub.setText("Select mode, interval, and shuffling sequence");
+
+        LinearLayout listContainer = dialog.findViewById(R.id.dialogListContainer);
+        ThemePreviewView previewTheme = dialog.findViewById(R.id.dialogPreviewView);
+        if (previewTheme != null) previewTheme.setVisibility(View.GONE);
+        ImageView previewImage = dialog.findViewById(R.id.dialogPreviewImage);
+        if (previewImage != null) previewImage.setVisibility(View.VISIBLE);
+        TextView previewTitle = dialog.findViewById(R.id.dialogPreviewTitle);
+        LinearLayout previewBadges = dialog.findViewById(R.id.dialogPreviewBadges);
+        TextView previewDesc = dialog.findViewById(R.id.dialogPreviewDescription);
+        TextView applyPrompt = dialog.findViewById(R.id.dialogActionPrompt);
 
         float density = getResources().getDisplayMetrics().density;
 
@@ -437,15 +445,7 @@ public final class LauncherSettingsActivity extends Activity {
         });
         cycleRow.setOnClickListener(v -> {
             changed();
-            Toast.makeText(this, "Cycling to next wallpaper...", Toast.LENGTH_SHORT).show();
-            new OnlineWallpaperFetcher(this, 1920, 1080, 0, true, new OnlineWallpaperFetcher.Callback() {
-                @Override
-                public void onWallpaperLoaded(Bitmap bitmap) {
-                    previewImage.post(() -> previewImage.setImageBitmap(bitmap));
-                }
-                @Override
-                public void onWallpaperFailed() {}
-            }).start();
+            Toast.makeText(this, "Wallpaper updated", Toast.LENGTH_SHORT).show();
         });
 
         if (themePicRow != null) {
@@ -504,22 +504,6 @@ public final class LauncherSettingsActivity extends Activity {
                 Bitmap bmp = BitmapFactory.decodeFile(f.getAbsolutePath());
                 if (bmp != null) {
                     previewImage.setImageBitmap(bmp);
-                    return;
-                }
-            } catch (Throwable ignored) {}
-        }
-        Bitmap bmp = OnlineWallpaperFetcher.latestBitmap;
-        if (bmp != null && !bmp.isRecycled()) {
-            previewImage.setImageBitmap(bmp);
-            return;
-        }
-        File cacheDir = OnlineWallpaperFetcher.getCacheDirectory(this);
-        File[] cached = cacheDir.listFiles((d, n) -> n.endsWith(".jpg") && new File(d, n).length() > 5000);
-        if (cached != null && cached.length > 0) {
-            try {
-                Bitmap decoded = BitmapFactory.decodeFile(cached[0].getAbsolutePath());
-                if (decoded != null) {
-                    previewImage.setImageBitmap(decoded);
                     return;
                 }
             } catch (Throwable ignored) {}
@@ -647,12 +631,17 @@ public final class LauncherSettingsActivity extends Activity {
             dialog.getWindow().setBackgroundDrawable(new ColorDrawable(0xFA0B0E14));
         }
 
-        LinearLayout listContainer = dialog.findViewById(R.id.themeListContainer);
-        ThemePreviewView previewView = dialog.findViewById(R.id.dialogThemePreview);
+        TextView headerTitle = dialog.findViewById(R.id.dialogHeaderTitle);
+        headerTitle.setText(R.string.theme_label);
+        TextView headerSub = dialog.findViewById(R.id.dialogHeaderSubtitle);
+        headerSub.setText("Select a theme to preview");
+
+        LinearLayout listContainer = dialog.findViewById(R.id.dialogListContainer);
+        ThemePreviewView previewView = dialog.findViewById(R.id.dialogPreviewView);
         TextView previewTitle = dialog.findViewById(R.id.dialogPreviewTitle);
         LinearLayout previewBadges = dialog.findViewById(R.id.dialogPreviewBadges);
         TextView previewDesc = dialog.findViewById(R.id.dialogPreviewDescription);
-        TextView applyPrompt = dialog.findViewById(R.id.dialogApplyPrompt);
+        TextView applyPrompt = dialog.findViewById(R.id.dialogActionPrompt);
 
         String current = choices.getString(Config.THEME_PRESET_KEY, "glass");
         float density = getResources().getDisplayMetrics().density;
@@ -665,7 +654,7 @@ public final class LauncherSettingsActivity extends Activity {
             TextView row = new TextView(this);
             String title = themeData.title;
             if (themeKey.equals(current)) {
-                title += "  [" + getString(R.string.theme_current_tag) + "]";
+                title += "  [Active]";
             }
             row.setText(title);
             row.setTextColor(0xFFFFFFFF);
@@ -688,14 +677,14 @@ public final class LauncherSettingsActivity extends Activity {
                     renderBadges(previewBadges, themeData.badges);
                     previewDesc.setText(themeData.description);
                     applyPrompt.setText(themeKey.equals(current)
-                            ? getString(R.string.theme_current_tag) + " (" + getString(R.string.theme_label) + ")"
-                            : getString(R.string.theme_confirm_prompt));
+                            ? "Active (" + getString(R.string.theme_label) + ")"
+                            : "Press OK to apply");
                 }
             });
 
             row.setOnClickListener(v -> {
                 ThemeApplier.applyTheme(this, themeKey);
-                Toast.makeText(this, getString(R.string.theme_applied) + ": " + themeData.title, Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Theme applied: " + themeData.title, Toast.LENGTH_SHORT).show();
                 dialog.dismiss();
                 setResult(RESULT_OK);
                 finish();
@@ -781,20 +770,7 @@ public final class LauncherSettingsActivity extends Activity {
             dockChoices[i].setSelected(dockOpacity == DOCK_OPACITIES[i]);
         }
         String currentTheme = choices.getString(Config.THEME_PRESET_KEY, "glass");
-        String themeName = getString(R.string.theme_glass);
-        if ("nature_calm".equals(currentTheme)) themeName = getString(R.string.theme_nature_calm);
-        else if ("retro".equals(currentTheme)) themeName = getString(R.string.theme_retro);
-        else if ("ruska".equals(currentTheme)) themeName = getString(R.string.theme_ruska);
-        else if ("aurora".equals(currentTheme)) themeName = getString(R.string.theme_aurora);
-        else if ("sweden".equals(currentTheme)) themeName = getString(R.string.theme_sweden);
-        else if ("six_columns".equals(currentTheme)) themeName = getString(R.string.theme_six_columns);
-        else if ("dussehra".equals(currentTheme)) themeName = getString(R.string.theme_dussehra);
-        else if ("scenes".equals(currentTheme)) themeName = getString(R.string.theme_scenes);
-        else if ("dark".equals(currentTheme)) themeName = getString(R.string.theme_dark);
-        else if ("light".equals(currentTheme)) themeName = getString(R.string.theme_light);
-        else if ("night".equals(currentTheme)) themeName = getString(R.string.theme_night);
-        else if ("default".equals(currentTheme)) themeName = getString(R.string.theme_default);
-        themeChoice.setText(getString(R.string.theme_state, themeName));
+        themeChoice.setText(getString(R.string.theme_state, ThemePreviewData.get(currentTheme).title));
 
         animationsChoice.setText(getString(R.string.animations_state,
                 getString(animations ? R.string.on : R.string.off)));
@@ -844,17 +820,22 @@ public final class LauncherSettingsActivity extends Activity {
 
     private void showSwitchesPicker() {
         Dialog dialog = new Dialog(this, R.style.Theme_TvHome);
-        dialog.setContentView(R.layout.dialog_switches_picker);
+        dialog.setContentView(R.layout.dialog_theme_picker);
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawable(new ColorDrawable(0xFA0B0E14));
         }
 
-        LinearLayout listContainer = dialog.findViewById(R.id.switchesListContainer);
-        ThemePreviewView previewView = dialog.findViewById(R.id.dialogSwitchesPreview);
-        TextView previewTitle = dialog.findViewById(R.id.dialogSwitchTitle);
-        LinearLayout previewBadges = dialog.findViewById(R.id.dialogSwitchBadges);
-        TextView previewDesc = dialog.findViewById(R.id.dialogSwitchDescription);
-        TextView prompt = dialog.findViewById(R.id.dialogSwitchPrompt);
+        TextView headerTitle = dialog.findViewById(R.id.dialogHeaderTitle);
+        headerTitle.setText(R.string.custom_switches_title);
+        TextView headerSub = dialog.findViewById(R.id.dialogHeaderSubtitle);
+        headerSub.setText(R.string.custom_switches_desc);
+
+        LinearLayout listContainer = dialog.findViewById(R.id.dialogListContainer);
+        ThemePreviewView previewView = dialog.findViewById(R.id.dialogPreviewView);
+        TextView previewTitle = dialog.findViewById(R.id.dialogPreviewTitle);
+        LinearLayout previewBadges = dialog.findViewById(R.id.dialogPreviewBadges);
+        TextView previewDesc = dialog.findViewById(R.id.dialogPreviewDescription);
+        TextView prompt = dialog.findViewById(R.id.dialogActionPrompt);
 
         String currentTheme = choices.getString(Config.THEME_PRESET_KEY, "glass");
         previewView.setTheme(ThemePreviewData.get(currentTheme));
@@ -864,7 +845,7 @@ public final class LauncherSettingsActivity extends Activity {
 
         // Reset row
         TextView resetRow = new TextView(this);
-        resetRow.setText(R.string.switch_reset_defaults);
+        resetRow.setText("Reset all switches to defaults");
         resetRow.setTextColor(0xFF389BFF);
         resetRow.setTextSize(15);
         resetRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -880,7 +861,7 @@ public final class LauncherSettingsActivity extends Activity {
 
         resetRow.setOnFocusChangeListener((v, hasFocus) -> {
             if (hasFocus) {
-                previewTitle.setText(R.string.switch_reset_defaults);
+                previewTitle.setText("Reset all switches to defaults");
                 previewDesc.setText("Reset all 26 feature switches back to the currently selected theme preset defaults.");
                 renderBadges(previewBadges, new String[]{"ACTION", "RESET"});
                 prompt.setText("Press OK to reset all switches");
@@ -892,7 +873,7 @@ public final class LauncherSettingsActivity extends Activity {
             for (CustomSwitchData.SwitchItem item : CustomSwitchData.ALL) ed.remove(item.key);
             ed.apply();
             changed();
-            Toast.makeText(this, R.string.switches_reset_applied, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Switches reset to theme defaults", Toast.LENGTH_SHORT).show();
             dialog.dismiss();
             showSwitchesPicker();
         });
@@ -953,7 +934,7 @@ public final class LauncherSettingsActivity extends Activity {
                             ? choices.getBoolean(item.key, item.defaultVal)
                             : Config.getSwitchValue(Config.load(this), item.key);
                     renderBadges(previewBadges, new String[]{item.category, cur ? "STATUS: ON" : "STATUS: OFF"});
-                    prompt.setText(getString(R.string.switch_toggle_hint));
+                    prompt.setText("Press OK to toggle • BACK to close");
                 }
             });
 
@@ -977,7 +958,7 @@ public final class LauncherSettingsActivity extends Activity {
     }
 
     private void updateBadgeVisual(TextView badge, boolean on) {
-        badge.setText(on ? R.string.switch_on : R.string.switch_off);
+        badge.setText(on ? "ON" : "OFF");
         badge.setTextColor(on ? 0xFF30D158 : 0xFF8E8E93);
     }
 

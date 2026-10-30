@@ -31,6 +31,8 @@ every page that carries them to being written.
 
 Run from the repository root: python3 -m unittest discover -s tests -v
 """
+from __future__ import annotations
+
 import io
 import re
 import sys

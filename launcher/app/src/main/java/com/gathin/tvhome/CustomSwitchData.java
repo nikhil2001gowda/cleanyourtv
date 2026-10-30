@@ -5,8 +5,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Metadata and catalog of all configurable boolean feature flags in the launcher,
- * providing descriptive categories and explanations for on-TV toggle customization.
+ * Metadata and catalog of all configurable boolean feature flags in the launcher.
  */
 public final class CustomSwitchData {
 
@@ -17,11 +16,11 @@ public final class CustomSwitchData {
         public final String description;
         public final boolean defaultVal;
 
-        public SwitchItem(String key, String title, String category, String description, boolean defaultVal) {
+        public SwitchItem(String key, String title, String category, boolean defaultVal) {
             this.key = key;
             this.title = title;
             this.category = category;
-            this.description = description;
+            this.description = title;
             this.defaultVal = defaultVal;
         }
     }
@@ -29,76 +28,38 @@ public final class CustomSwitchData {
     public static final List<SwitchItem> ALL;
 
     static {
+        String[] data = {
+            "cinematic_home", "Cinematic Shelf & Posters", "LAYOUT", "1",
+            "cinematic_dots", "Shelf Position Indicator Dots", "LAYOUT", "1",
+            "single_row", "Single Horizontal Scrolling Row", "LAYOUT", "0",
+            "dock_glass", "Frosted Glass Dock Band", "DOCK", "1",
+            "dock_band", "Show Dock Backing Band", "DOCK", "1",
+            "dock_title", "Dock Focused App Title", "DOCK", "0",
+            "app_glow", "App Brand Accent Focus Glow", "GLOW", "1",
+            "ambient_glow", "Ambient Dock Lighting", "GLOW", "1",
+            "always_show_names", "Always Show App Names", "TILES", "0",
+            "tile_menu", "App Tile Long-Press Menu", "TILES", "1",
+            "uniform_tiles", "Uniform Card Shapes", "TILES", "0",
+            "show_inputs_pill", "Show Inputs Pill", "HEADER", "1",
+            "show_status_clock", "Header Status Clock", "HEADER", "1",
+            "show_status_badges", "Header Network & VPN Badges", "HEADER", "1",
+            "show_status_pill", "Control Center Status Pill", "HEADER", "1",
+            "show_settings_pill", "Launcher Settings Header Pill", "HEADER", "1",
+            "show_sleep_pill", "Quick Sleep Screen Pill", "HEADER", "1",
+            "show_bluetooth_pill", "Quick Bluetooth Header Pill", "HEADER", "1",
+            "show_memory_pill", "Quick Memory Monitor Pill", "HEADER", "1",
+            "screensaver", "Built-in Screensaver Clock", "SCREENSAVER", "1",
+            "screensaver_fade", "Gentle Ambient Fading", "SCREENSAVER", "1",
+            "wallpaper_zoom", "Smooth Ambient Motion", "MOTION", "1",
+            "banner_bounce", "Spring Dynamics & Bounces", "MOTION", "1",
+            "dpad_glow_ripple", "Interactive Directional Light Wave", "MOTION", "1",
+            "wallpaper_dimming", "Dim Wallpaper Behind Focused Content", "WALLPAPER", "1",
+            "wallpaper_scrim", "Header Protection Scrim Gradient", "WALLPAPER", "1"
+        };
         List<SwitchItem> list = new ArrayList<>(26);
-
-        // 1. Layout & Shelf
-        list.add(new SwitchItem("cinematic_home", "Cinematic Shelf & Posters", "LAYOUT & SHELF",
-                "16:9 shelf above favorites.", true));
-        list.add(new SwitchItem("cinematic_dots", "Shelf Position Indicator Dots", "LAYOUT & SHELF",
-                "Indicator dots under shelf.", true));
-        list.add(new SwitchItem("single_row", "Single Horizontal Scrolling Row", "LAYOUT & SHELF",
-                "Single-row app layout.", false));
-
-        // 2. Dock Styling
-        list.add(new SwitchItem("dock_glass", "Frosted Glass Dock Band", "DOCK STYLING",
-                "Frosted glass dock band.", true));
-        list.add(new SwitchItem("dock_band", "Show Dock Backing Band", "DOCK STYLING",
-                "Backing band behind dock.", true));
-        list.add(new SwitchItem("dock_title", "Dock Focused App Title", "DOCK STYLING",
-                "App title above dock.", false));
-
-        // 3. Lighting & Glow
-        list.add(new SwitchItem("app_glow", "App Brand Accent Focus Glow", "LIGHTING & GLOW",
-                "Focus in app brand color.", true));
-        list.add(new SwitchItem("ambient_glow", "Ambient Dock Lighting", "LIGHTING & GLOW",
-                "Ambient glow behind dock.", true));
-
-        // 4. Tiles & App Cards
-        list.add(new SwitchItem("always_show_names", "Always Show App Names", "TILES & CARDS",
-                "Always show titles under tiles.", false));
-        list.add(new SwitchItem("tile_menu", "App Tile Long-Press Menu", "TILES & CARDS",
-                "Context menu on long-press.", true));
-        list.add(new SwitchItem("uniform_tiles", "Uniform Card Shapes", "TILES & CARDS",
-                "Uniform tinted cards.", false));
-
-        // 5. Visual Effects & Motion
-        list.add(new SwitchItem("fade_rows", "Fade Out Scrolling Rows", "VISUAL & MOTION",
-                "Fade upper rows on scroll.", true));
-        list.add(new SwitchItem("focus_overshoot", "Spring Focus Overshoot", "VISUAL & MOTION",
-                "Spring overshoot on focus.", true));
-        list.add(new SwitchItem("reduced_motion", "Reduced Motion Mode", "VISUAL & MOTION",
-                "Minimal animations.", false));
-
-        // 6. Header & Status Bar
-        list.add(new SwitchItem("show_network_pill", "Network Status Pill", "HEADER & STATUS",
-                "Network pill in header.", true));
-        list.add(new SwitchItem("show_inputs_pill", "Inputs & HDMI Switcher Pill", "HEADER & STATUS",
-                "HDMI / Inputs in header.", true));
-        list.add(new SwitchItem("icon_only_buttons", "Compact Header Buttons", "HEADER & STATUS",
-                "Compact header buttons.", false));
-        list.add(new SwitchItem("icon_only_inputs", "Icon-Only Inputs Pill", "HEADER & STATUS",
-                "Compact Inputs pill.", false));
-        list.add(new SwitchItem("wifi_status_color", "Active Wi-Fi Color Indicator", "HEADER & STATUS",
-                "Network color indicator.", true));
-        list.add(new SwitchItem("show_greeting", "Time-of-Day Greeting", "HEADER & STATUS",
-                "Greeting above clock.", true));
-        list.add(new SwitchItem("date_below_clock", "Date Below Clock", "HEADER & STATUS",
-                "Date below clock.", false));
-        list.add(new SwitchItem("header_white", "Crisp White Header", "HEADER & STATUS",
-                "Bright white header.", true));
-
-        // 7. Wallpaper & Art
-        list.add(new SwitchItem("wallpaper_captions", "Wallpaper Location Captions", "WALLPAPER",
-                "Wallpaper location captions.", true));
-        list.add(new SwitchItem("wallpaper_true_color", "32-bit Wallpaper Color Depth", "WALLPAPER",
-                "Full 32-bit color depth.", false));
-
-        // 8. Screensaver
-        list.add(new SwitchItem("clock_wallpaper", "Screensaver Wallpaper Backdrop", "SCREENSAVER",
-                "Wallpaper behind clock.", true));
-        list.add(new SwitchItem("clock_glow", "Screensaver Atmospheric Glow", "SCREENSAVER",
-                "Atmospheric clock glow.", true));
-
+        for (int i = 0; i < data.length; i += 4) {
+            list.add(new SwitchItem(data[i], data[i + 1], data[i + 2], "1".equals(data[i + 3])));
+        }
         ALL = Collections.unmodifiableList(list);
     }
 }

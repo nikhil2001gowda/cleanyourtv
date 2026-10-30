@@ -258,7 +258,7 @@
             android:paddingTop="8dp"
             android:paddingEnd="16dp"
             android:paddingBottom="8dp"
-            android:text="@string/theme_preview_hint"
+            android:text="Select an option to preview"
             android:textColor="#FFE5F5EC"
             android:textSize="13sp" />
     </LinearLayout>

@@ -7,33 +7,32 @@
     android:orientation="horizontal"
     android:padding="28dp">
 
-    <!-- Left: Scrollable Theme List -->
+    <!-- Left: Scrollable List -->
     <LinearLayout
-        android:layout_width="380dp"
+        android:layout_width="420dp"
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:paddingEnd="24dp">
 
         <TextView
+            android:id="@+id/dialogHeaderTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:fontFamily="@string/font_medium"
             android:letterSpacing="0.01"
-            android:text="@string/theme_label"
             android:textColor="#FFFFFFFF"
             android:textSize="28sp" />
 
         <TextView
+            android:id="@+id/dialogHeaderSubtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:layout_marginBottom="16dp"
-            android:text="@string/theme_preview_hint"
             android:textColor="#FF8E9AA8"
             android:textSize="13sp" />
 
         <ScrollView
-            android:id="@+id/themePickerScrollView"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
@@ -41,7 +40,7 @@
             android:scrollbars="none">
 
             <LinearLayout
-                android:id="@+id/themeListContainer"
+                android:id="@+id/dialogListContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
@@ -64,11 +63,26 @@
         android:paddingStart="36dp"
         android:paddingEnd="16dp">
 
-        <com.gathin.tvhome.ThemePreviewView
-            android:id="@+id/dialogThemePreview"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="20dp" />
+            android:layout_height="210dp"
+            android:layout_marginBottom="20dp"
+            android:background="@drawable/settings_choice_bg"
+            android:clipToOutline="true">
+
+            <com.gathin.tvhome.ThemePreviewView
+                android:id="@+id/dialogPreviewView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <ImageView
+                android:id="@+id/dialogPreviewImage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:visibility="gone"
+                android:importantForAccessibility="no" />
+        </FrameLayout>
 
         <TextView
             android:id="@+id/dialogPreviewTitle"
@@ -95,7 +109,7 @@
             android:textSize="14sp" />
 
         <TextView
-            android:id="@+id/dialogApplyPrompt"
+            android:id="@+id/dialogActionPrompt"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
@@ -104,7 +118,6 @@
             android:paddingTop="8dp"
             android:paddingEnd="16dp"
             android:paddingBottom="8dp"
-            android:text="@string/theme_confirm_prompt"
             android:textColor="#FFE5F5EC"
             android:textSize="13sp" />
     </LinearLayout>

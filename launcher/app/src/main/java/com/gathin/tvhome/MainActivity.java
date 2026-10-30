@@ -148,11 +148,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private RecyclerView grid;
     private FrameLayout root;
     private WallpaperPlayer wallpaperPlayer;
-    private ImageView onlineWallpaperView;
-    private Bitmap onlineWallpaperBmp;
-    private OnlineWallpaperFetcher onlineWallpaperFetcher;
-    private boolean onlineWallpaperActive = false;
-    private boolean isOnlineWallpaperMode = false;
     private boolean hasWallpaper = false;
     private int currentFocusColor = 0xFF1E293B;
     private GlassView glass;
@@ -507,10 +502,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // the theme's background, so launch looks the same.
         getWindow().setBackgroundDrawable(null);
         wallpaperPlayer = new WallpaperPlayer(this, root, cfg);
-        SharedPreferences choices = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
-        String wpSource = choices.getString("wallpaper_source", "online");
-        isOnlineWallpaperMode = !"theme".equals(wpSource) && !"none".equals(wpSource) && cfg.wallpaperEnabled;
-        hasWallpaper = !"none".equals(wpSource) && cfg.wallpaperEnabled && (isOnlineWallpaperMode || !cfg.wallpapers.isEmpty());
+        hasWallpaper = cfg.wallpaperEnabled && !cfg.wallpapers.isEmpty();
 
         sky = findViewById(R.id.sky);
         sky.setIntensity(cfg.skyIntensity);
@@ -521,57 +513,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         ambient.forceHasOverlappingRendering(false);
         ambientGlow = cfg.ambientGlow && !hasWallpaper;
         appGlow = cfg.appGlow;
-        if (!ambientGlow || hasWallpaper || isOnlineWallpaperMode) {
+        if (!ambientGlow || hasWallpaper) {
             ambient.setVisibility(View.GONE);
             ambient.setAlpha(0f);
         }
-        if (hasWallpaper || isOnlineWallpaperMode) {
+        if (hasWallpaper) {
             sky.setVisibility(View.GONE);
-        }
-
-        if (isOnlineWallpaperMode) {
-            onlineWallpaperView = new ImageView(this);
-            onlineWallpaperView.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            onlineWallpaperView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            int ambientIdx = root.indexOfChild(ambient);
-            root.addView(onlineWallpaperView, Math.max(0, ambientIdx + 1), new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-            boolean shuffle = !WallpaperRotation.ORDER_SEQUENTIAL.equals(cfg.wallpaperOrder);
-            long intervalMs = cfg.wallpaperRotationMinutes * 60_000L;
-            onlineWallpaperFetcher = new OnlineWallpaperFetcher(this, 1920, 1080,
-                    intervalMs, shuffle, new OnlineWallpaperFetcher.Callback() {
-                @Override
-                public void onWallpaperLoaded(Bitmap bitmap) {
-                    onlineWallpaperActive = true;
-                    Bitmap old = onlineWallpaperBmp;
-                    onlineWallpaperBmp = bitmap;
-                    onlineWallpaperView.setImageBitmap(bitmap);
-                    onlineWallpaperView.setVisibility(View.VISIBLE);
-                    onlineWallpaperView.setAlpha(0f);
-                    onlineWallpaperView.animate().alpha(1f).setDuration(500).start();
-                    // Wallpaper is active: turn off ambient gradient completely so wallpaper is untouched
-                    if (ambient != null) {
-                        ambient.animate().cancel();
-                        ambient.setVisibility(View.GONE);
-                        ambient.setAlpha(0f);
-                    }
-                    if (sky != null) sky.setVisibility(View.GONE);
-                    if (old != null && old != bitmap) {
-                        onlineWallpaperView.postDelayed(old::recycle, 600);
-                    }
-                }
-
-                @Override
-                public void onWallpaperFailed() {
-                    onlineWallpaperActive = false;
-                    // Keep ambient completely off so app selection gradient never touches wallpaper
-                    if (ambient != null) {
-                        ambient.setVisibility(View.GONE);
-                        ambient.setAlpha(0f);
-                    }
-                }
-            });
         }
         heroName = findViewById(R.id.heroName);
         hero = findViewById(R.id.hero);
@@ -1357,7 +1304,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (gameDay != null) gameDay.start();
         sky.update();
         wallpaperPlayer.start();
-        if (onlineWallpaperFetcher != null) onlineWallpaperFetcher.start();
         handler.postDelayed(minuteTick, MINUTE_MS);
         if (festive && lamp != null) {
             lamp.start();
@@ -1532,7 +1478,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         root.removeCallbacks(showIdleClock);
         endReorder();   // Home or another app while reordering keeps the order so far
         wallpaperPlayer.stop();
-        if (onlineWallpaperFetcher != null) onlineWallpaperFetcher.stop();
         stopAmbientAnimation();
         hero.animate().cancel();
         ambient.animate().cancel();
@@ -1615,7 +1560,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (gameDay != null) gameDay.shutdown();
         unregisterReceiver(packageReceiver);
         wallpaperPlayer.close();
-        if (onlineWallpaperFetcher != null) onlineWallpaperFetcher.stop();
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
         if (tim != null) tim.unregisterCallback(inputCallback);
@@ -2193,7 +2137,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             hero.setY(y);
             hero.setTranslationX(0f);
             hero.setAlpha(1f);
-            if (!hasWallpaper && !isOnlineWallpaperMode && !onlineWallpaperActive && ambientGlow) {
+            if (!hasWallpaper && ambientGlow) {
                 ambient.setVisibility(View.VISIBLE);
                 setAmbient(color);
                 ambient.setAlpha(1f);
@@ -2212,7 +2156,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             hero.setY(y);
             hero.setTranslationX(0f);
             hero.animate().alpha(1f).setDuration(260).start();
-            if (!hasWallpaper && !isOnlineWallpaperMode && !onlineWallpaperActive && ambientGlow) {
+            if (!hasWallpaper && ambientGlow) {
                 ambient.setVisibility(View.VISIBLE);
                 setAmbient(color);
                 ambient.animate().alpha(1f).setDuration(600).start();
@@ -2231,7 +2175,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 hero.setTranslationX(12 * density);
                 hero.animate().alpha(1f).translationX(0f).setDuration(200).start();
             }).start();
-            if (!hasWallpaper && !isOnlineWallpaperMode && !onlineWallpaperActive && ambientGlow) {
+            if (!hasWallpaper && ambientGlow) {
                 ambient.setVisibility(View.VISIBLE);
                 if (advancedEffects) {
                     transitionAmbient(color);
@@ -2250,10 +2194,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             // onPause cancels the fade-ins, and a second Home during one lands on the same tile, which starts none:
             // finish them, or the shelf and the glow stay dim until focus moves to another app.
             if (hero.getAlpha() < 1f) hero.animate().alpha(1f).setDuration(260).start();
-            if (!hasWallpaper && !isOnlineWallpaperMode && !onlineWallpaperActive && ambientGlow && color == ambientColor && ambient.getAlpha() < 1f) {
+            if (!hasWallpaper && ambientGlow && color == ambientColor && ambient.getAlpha() < 1f) {
                 ambient.setVisibility(View.VISIBLE);
                 ambient.animate().alpha(1f).setDuration(600).start();
-            } else if (hasWallpaper || isOnlineWallpaperMode || onlineWallpaperActive) {
+            } else if (hasWallpaper) {
                 ambient.setVisibility(View.GONE);
                 ambient.setAlpha(0f);
             }
@@ -2353,7 +2297,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      * so changing apps neither repaints it on the CPU (about 11 ms) nor uploads it again.
      */
     private void setAmbient(int color) {
-        if (hasWallpaper || isOnlineWallpaperMode || onlineWallpaperActive || !ambientGlow) {
+        if (hasWallpaper || !ambientGlow) {
             ambient.setVisibility(View.GONE);
             ambient.setAlpha(0f);
             return;
@@ -2406,7 +2350,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     private void transitionAmbient(int color) {
-        if (hasWallpaper || isOnlineWallpaperMode || onlineWallpaperActive || !ambientGlow) {
+        if (hasWallpaper || !ambientGlow) {
             ambient.setVisibility(View.GONE);
             ambient.setAlpha(0f);
             return;
@@ -2445,7 +2389,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         heroArt.animate().cancel();
         heroArt.setAlpha(0f);
         heroShown = false;
-        if (!ambientGlow || hasWallpaper || onlineWallpaperActive || isOnlineWallpaperMode) {
+        if (!ambientGlow || hasWallpaper) {
             ambient.setVisibility(View.GONE);
             ambient.setAlpha(0f);
             return;

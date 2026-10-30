@@ -1,4 +1,10 @@
-# Shrink and optimise, but keep class and method names: the size win comes from dropping unused
-# AndroidX code, not from renaming, and readable stack traces matter more in a sideloaded app
-# where crash reports arrive as screenshots.
--dontobfuscate
+-optimizationpasses 5
+-repackageclasses ""
+-allowaccessmodification
+-assumenosideeffects class android.util.Log {
+    public static boolean isLoggable(java.lang.String, int);
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+    public static int w(...);
+}
