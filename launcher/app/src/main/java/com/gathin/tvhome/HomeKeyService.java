@@ -93,6 +93,13 @@ public class HomeKeyService extends AccessibilityService {
     /** The bound helper, so the opt-in broadcast can arm it without waiting for a new connection. */
     private static HomeKeyService running;
 
+    static boolean sleep() {
+        if (running != null && Build.VERSION.SDK_INT >= 28) {
+            return running.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN);
+        }
+        return false;
+    }
+
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
@@ -200,8 +207,15 @@ public class HomeKeyService extends AccessibilityService {
         boolean watchFront = !frontAppKeys.isEmpty() || !frontAppScancodes.isEmpty();
         stockHome.clear();
         stockHomePackage = config.stockHomeRedirect;
-        if (!config.stockHomeRedirect.isEmpty()) {
-            Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(config.stockHomeRedirect);
+        if (stockHomePackage.isEmpty()) {
+            ResolveInfo ri = getPackageManager().resolveActivity(
+                    new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY);
+            if (ri != null && ri.activityInfo != null && !getPackageName().equals(ri.activityInfo.packageName)) {
+                stockHomePackage = ri.activityInfo.packageName;
+            }
+        }
+        if (!stockHomePackage.isEmpty()) {
+            Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(stockHomePackage);
             for (ResolveInfo ri : getPackageManager().queryIntentActivities(home, PackageManager.MATCH_DISABLED_COMPONENTS)) {
                 stockHome.add(ri.activityInfo.name);
             }
@@ -283,7 +297,7 @@ public class HomeKeyService extends AccessibilityService {
             return true;
         }
         if (event.getKeyCode() == KeyEvent.KEYCODE_HOME && !stockHome.isEmpty()) {
-            redirectHomeKey(event);
+            if (redirectHomeKey(event)) return true;
             return false;
         }
         if (event.getKeyCode() != KeyEvent.KEYCODE_ALL_APPS) return false;
@@ -392,8 +406,6 @@ public class HomeKeyService extends AccessibilityService {
         return boot >= 0 && boot != lastBoot && uptimeMs < BOOT_WINDOW_MS;
     }
 
-    /** Lets the system see the key, so a long press still does what the firmware gives it. */
-    private static final long HOME_KEY_DELAY_MS = 250;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     /** stock_home_redirect on the Home key: when the stock home is already on screen (it came up at boot, before
@@ -401,11 +413,13 @@ public class HomeKeyService extends AccessibilityService {
      *  fires and the TV stays on the stock home until another app opens (#1116). A short press opens this
      *  launcher shortly after the system has handled the key; a long press (Google TV's quick settings) is left
      *  alone. Held time, not repeats: key repeats are made after accessibility filtering, so none arrive here. */
-    private void redirectHomeKey(KeyEvent event) {
+    private boolean redirectHomeKey(KeyEvent event) {
         if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()
                 && isShortPress(event.getDownTime(), event.getEventTime(), ViewConfiguration.getLongPressTimeout())) {
-            handler.postDelayed(this::openHome, HOME_KEY_DELAY_MS);
+            openHome();
+            return true;
         }
+        return false;
     }
 
     static boolean isShortPress(long downTime, long upTime, long longPressTimeout) {

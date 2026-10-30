@@ -96,7 +96,7 @@ public final class LauncherSettingsActivity extends Activity {
             columnChoices[i].setOnFocusChangeListener((v, hasFocus) -> {
                 if (hasFocus) {
                     updateSettingsPreview(getString(R.string.columns_label) + ": " + value,
-                            "Adjust how many apps are shown per row in the grid. 4 gives larger cards; 6-7 offers high density.",
+                            "Grid columns per row.",
                             new String[]{value + " COLUMNS", "GRID DENSITY"},
                             choices.getString(Config.THEME_PRESET_KEY, "glass"), null);
                 }
@@ -116,7 +116,7 @@ public final class LauncherSettingsActivity extends Activity {
             dockChoices[i].setOnFocusChangeListener((v, hasFocus) -> {
                 if (hasFocus) {
                     updateSettingsPreview(getString(R.string.dock_opacity_label) + ": " + value + "%",
-                            "Change the translucency of the dock band behind your favorite apps.",
+                            "Translucency of dock band.",
                             new String[]{value + "% OPACITY", "DOCK BAND"},
                             choices.getString(Config.THEME_PRESET_KEY, "glass"), null);
                 }
@@ -150,7 +150,7 @@ public final class LauncherSettingsActivity extends Activity {
                 String badge2 = interval <= 0 ? "STATIC" : interval + " MIN";
                 String badge3 = "sequential".equals(order) ? "SEQUENTIAL" : "SHUFFLE";
                 updateSettingsPreview(getString(R.string.wallpaper_label),
-                        "Configure online 8K wallpapers, auto-change rotation interval, and shuffle order.",
+                        "Configure wallpaper source and rotation.",
                         new String[]{badge1, badge2, badge3},
                         null, "Press OK to configure wallpapers");
             }
@@ -167,7 +167,7 @@ public final class LauncherSettingsActivity extends Activity {
         animationsChoice.setOnFocusChangeListener((v, hasFocus) -> {
             if (hasFocus) {
                 updateSettingsPreview(getString(R.string.animations_state, getString(animations ? R.string.on : R.string.off)),
-                        "Control fluid spring physics, overshoot, and navigation animations.",
+                        "Spring physics and animations.",
                         new String[]{animations ? "ENABLED" : "OFF", "MOTION"},
                         choices.getString(Config.THEME_PRESET_KEY, "glass"), null);
             }
@@ -188,7 +188,7 @@ public final class LauncherSettingsActivity extends Activity {
         advancedChoice.setOnFocusChangeListener((v, hasFocus) -> {
             if (hasFocus) {
                 updateSettingsPreview(getString(R.string.advanced_effects),
-                        "Enable real-time horizon glow, lighting reflections, and elevated cards.",
+                        "Real-time horizon glow and reflections.",
                         new String[]{advancedEffects ? "ACTIVE" : "OFF", "HORIZON GLOW"},
                         choices.getString(Config.THEME_PRESET_KEY, "glass"), null);
             }
@@ -212,7 +212,7 @@ public final class LauncherSettingsActivity extends Activity {
             openOnStartChoice.setOnFocusChangeListener((v, hasFocus) -> {
                 if (hasFocus) {
                     updateSettingsPreview(getString(R.string.open_on_start_label),
-                            "Choose an app to automatically open whenever the TV boots up.",
+                            "Auto-launch app on TV startup.",
                             new String[]{"STARTUP", "AUTO LAUNCH"},
                             choices.getString(Config.THEME_PRESET_KEY, "glass"), null);
                 }
@@ -260,7 +260,7 @@ public final class LauncherSettingsActivity extends Activity {
         findViewById(R.id.tvSettingsChoice).setOnFocusChangeListener((v, hasFocus) -> {
             if (hasFocus) {
                 updateSettingsPreview(getString(R.string.tv_settings),
-                        "Open the TV's native system settings panel for display, sound, network, and devices.",
+                        "Native system settings panel.",
                         new String[]{"SYSTEM", "DEVICE SETTINGS"},
                         choices.getString(Config.THEME_PRESET_KEY, "glass"), null);
             }

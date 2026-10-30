@@ -31,27 +31,10 @@ public final class OnlineWallpaperFetcher {
 
     private static final String TAG = "OnlineWallpaper";
 
-    private static final String[] WALLPAPER_URLS = new String[]{
-            "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=3840&q=80",
-            "https://images.unsplash.com/photo-1511884642898-4c92249e20b6?w=3840&q=80",
-            "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=3840&q=80",
-            "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=3840&q=80",
-            "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=3840&q=80",
-            "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=3840&q=80",
-            "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=3840&q=80",
-            "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=3840&q=80",
-            "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=3840&q=80",
-            "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=3840&q=80",
-            "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=3840&q=80",
-            "https://images.unsplash.com/photo-1434725039720-aaad6dd32dfe?w=3840&q=80",
-            "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=3840&q=80",
-            "https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=3840&q=80",
-            "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=3840&q=80",
-            "https://images.unsplash.com/photo-1475924156734-496f6cac6ec1?w=3840&q=80",
-            "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=3840&q=80",
-            "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=3840&q=80",
-            "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=3840&q=80",
-            "https://images.unsplash.com/photo-1426604966848-d7adac402bff?w=3840&q=80"
+    private static final String[] WALLPAPER_IDS = new String[]{
+            "1506744038136-46273834b3fb",
+            "1511884642898-4c92249e20b6",
+            "1470071459604-3b5ec3a7fe05"
     };
 
     private final Callback callback;
@@ -116,12 +99,12 @@ public final class OnlineWallpaperFetcher {
 
             int nextIdx;
             if (shuffle) {
-                nextIdx = (currentIndex + 1 + random.nextInt(WALLPAPER_URLS.length - 1)) % WALLPAPER_URLS.length;
+                nextIdx = (currentIndex + 1 + random.nextInt(WALLPAPER_IDS.length - 1)) % WALLPAPER_IDS.length;
             } else {
-                nextIdx = (currentIndex + 1) % WALLPAPER_URLS.length;
+                nextIdx = (currentIndex + 1) % WALLPAPER_IDS.length;
             }
             currentIndex = nextIdx;
-            String url = WALLPAPER_URLS[nextIdx];
+            String url = "https://images.unsplash.com/photo-" + WALLPAPER_IDS[nextIdx] + "?w=3840&q=80";
             File targetFile = new File(cacheDir, "wp_" + nextIdx + ".jpg");
 
             boolean success = false;

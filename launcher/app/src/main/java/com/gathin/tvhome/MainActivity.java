@@ -880,6 +880,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             libraryFromTopBar = true;   // closing it goes back to this button, not to the pill after the last row
         });
         btnLibraryTop.setVisibility(cfg.libraryButton && cfg.appLibrary ? View.VISIBLE : View.GONE);
+        btnControlCenter = findViewById(R.id.btnControlCenter);
+        if (btnControlCenter != null) {
+            btnControlCenter.setOnClickListener(v -> showQuickAccessPanel());
+        }
         addTopBarApps(cfg.topBarApps, cfg.launchActions);
         iconOnlyButtons = cfg.iconOnlyButtons;
         topMenu = cfg.topMenu;
@@ -957,12 +961,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnSettings.setOnKeyListener(pillKeys);
         btnReorder.setOnKeyListener(pillKeys);
         btnLibraryTop.setOnKeyListener(pillKeys);
+        if (btnControlCenter != null) btnControlCenter.setOnKeyListener(pillKeys);
         for (View button : topAppButtons) button.setOnKeyListener(pillKeys);
         if (advancedEffects) {
             List<View> pills = new ArrayList<>();
             if (btnRam != null) pills.add(btnRam);
             if (btnBluetooth != null) pills.add(btnBluetooth);
             pills.addAll(Arrays.asList(btnInputs, btnWifi, btnVpn, btnReorder, btnLibraryTop, btnSettings));
+            if (btnControlCenter != null) pills.add(btnControlCenter);
             pills.addAll(topAppButtons);
             for (View button : pills) {
                 button.setOnFocusChangeListener((view, focused) -> view.animate()
@@ -1059,7 +1065,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         startActivityForResult(new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST);
     }
 
-    private void openNativeSettings() {
+    void openNativeSettings() {
         open(systemIntent(Settings.ACTION_SETTINGS));
     }
 
@@ -1537,6 +1543,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // Nothing of ours stays on screen over another app; an undecided prompt simply returns next time.
         if (cardPrompt != null) cardPrompt.dismiss();
         if (appLibrary != null) appLibrary.close();
+        if (quickAccessDialog != null) quickAccessDialog.close();
         if (openPopup != null) openPopup.dismiss();
     }
 
@@ -3230,6 +3237,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private ColorStateList wifiNoInternetTint, wifiOfflineTint;
     /** The app library button in the top bar (library_button). */
     private View btnLibraryTop;
+    /** The Control Center / Quick Access button in the top bar. */
+    private View btnControlCenter;
+    private QuickAccessDialog quickAccessDialog;
     /** The open library came from that button: closing it returns there instead of scrolling to the grid's end. */
     private boolean libraryFromTopBar;
     /** The open library came from the VPN pill (vpn_pill, no VPN app): closing it returns there while the pill still shows. */
@@ -3404,7 +3414,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
     }
 
-    private void optimizeRam(boolean notify) {
+    void optimizeRam(boolean notify) {
         long[] mBefore = memUsedOfTotalMb();
         long before = mBefore != null ? mBefore[0] : 0;
 
@@ -3608,7 +3618,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     /** Dropdown menu under the Inputs pill: HDMI ports (with connection state), AV and Live TV. */
-    private void showInputs() {
+    void showInputs() {
         // A configured source panel and no Live TV row to offer next to it: the panel is the whole menu.
         // The BYINTEK U4 needs this, as its TvInputManager lists three HDMI ports and an AV input it doesn't have.
         List<CoocaaSources.Source> coocaa = coocaaSources ? CoocaaSources.list(this) : Collections.emptyList();
@@ -3874,6 +3884,20 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         });
     }
 
+    private void showQuickAccessPanel() {
+        if (quickAccessDialog != null) quickAccessDialog.close();
+        if (appLibrary != null) appLibrary.close();
+        if (openPopup != null) openPopup.dismiss();
+
+        quickAccessDialog = new QuickAccessDialog(this, reducedMotion);
+        quickAccessDialog.show();
+    }
+
+    void onQuickAccessDismissed() {
+        quickAccessDialog = null;
+        if (btnControlCenter != null) btnControlCenter.requestFocus();
+    }
+
     static boolean isFireTv() {
         String mfg = Build.MANUFACTURER != null ? Build.MANUFACTURER : "";
         String model = Build.MODEL != null ? Build.MODEL.toUpperCase(Locale.ROOT) : "";
@@ -3943,7 +3967,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     /** Dropdown popup for the Wi-Fi pill: network details, signal info, and settings redirect. */
-    private void showNetworkPanel() {
+    void showNetworkPanel() {
         showPanel(btnWifi, (rows, popup) -> {
             ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
             Network active = cm != null ? cm.getActiveNetwork() : null;
@@ -4007,7 +4031,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     /** Dropdown popup for the Bluetooth pill: connected device details, type, and settings redirect. */
-    private void showBluetoothPanel() {
+    void showBluetoothPanel() {
         showPanel(btnBluetooth, (rows, popup) -> {
             for (String dev : getConnectedBluetoothDevices()) {
                 addPanelRow(rows, popup, R.drawable.ic_bluetooth, dev, "Connected", true, this::openBluetoothSettings);

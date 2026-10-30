@@ -644,19 +644,13 @@ final class Config {
             glassStyle = "light";
             appGlow = false;
             cinematic = false;
-        } else if ("night".equals(themePreset)) {
-            background = 0xFF000000;
-            headerWhite = true;
-            dockGlass = false;
-            appGlow = true;
-            glowStyle = "horizon";
-            cinematic = true;
-        } else if ("dark".equals(themePreset)) {
-            background = 0xFF12141A;
+        } else if ("night".equals(themePreset) || "dark".equals(themePreset)) {
+            background = "dark".equals(themePreset) ? 0xFF12141A : 0xFF000000;
             headerWhite = true;
             dockGlass = false;
             glassStyle = "flat";
             appGlow = true;
+            glowStyle = "horizon";
             cinematic = true;
         } else if ("glass".equals(themePreset)) {
             background = 0xFF0A0E1A;
@@ -668,7 +662,7 @@ final class Config {
             dockEvenPadding = true;
             iconOnlyButtons = true;
             headerWhite = true;
-        } else if ("nature_calm".equals(themePreset)) {
+        } else if ("nature_calm".equals(themePreset) || "sweden".equals(themePreset)) {
             if (!choices.contains("columns")) columns = 6;
             if (!choices.contains(ROWS_BELOW_DOCK_KEY)) rowsBelow = 1;
             background = 0xFF05070C;
@@ -718,22 +712,6 @@ final class Config {
             skyIntensity = 45;
             headerWhite = true;
             cinematic = true;
-        } else if ("sweden".equals(themePreset)) {
-            if (!choices.contains("columns")) columns = 6;
-            if (!choices.contains(ROWS_BELOW_DOCK_KEY)) rowsBelow = 1;
-            background = 0xFF05070C;
-            cinematic = false;
-            dockTitle = false;
-            dockGlass = true;
-            dockEvenPadding = true;
-            iconOnlyButtons = true;
-            iconOnlyInputs = true;
-            ambientGlow = false;
-            appGlow = false;
-            fadeRows = true;
-            focusOvershoot = false;
-            advancedEffects = true;
-            headerWhite = true;
         } else if ("six_columns".equals(themePreset)) {
             if (!choices.contains("columns")) columns = 6;
             if (!choices.contains(ROWS_BELOW_DOCK_KEY)) rowsBelow = 1;
@@ -741,15 +719,10 @@ final class Config {
             dockBand = true;
             headerWhite = true;
             cinematic = false;
-        } else if ("dussehra".equals(themePreset)) {
-            background = 0xFF120809;
+        } else if ("dussehra".equals(themePreset) || "scenes".equals(themePreset)) {
+            background = "dussehra".equals(themePreset) ? 0xFF120809 : 0xFF0A0E1A;
             dockGlass = true;
             cinematic = true;
-            headerWhite = true;
-        } else if ("scenes".equals(themePreset)) {
-            background = 0xFF0A0E1A;
-            cinematic = true;
-            dockGlass = true;
             headerWhite = true;
         } else if ("default".equals(themePreset)) {
             background = 0xFF000000;

@@ -91,185 +91,91 @@ public final class ThemeApplier {
 
     private static JSONObject buildThemeJson(String key) throws Exception {
         JSONObject obj = new JSONObject();
-        if ("nature_calm".equals(key)) {
+        obj.put("columns", 4);
+        obj.put("rows_below_dock", 0);
+        obj.put("header_white", true);
+        obj.put("cinematic_home", false);
+        obj.put("dock_opacity", 100);
+
+        if ("nature_calm".equals(key) || "sweden".equals(key)) {
             obj.put("columns", 6);
             obj.put("rows_below_dock", 1);
             obj.put("background_color", "#05070C");
             obj.put("wallpaper", true);
-            obj.put("cinematic_home", false);
-            obj.put("dock_title", false);
             obj.put("dock_glass", true);
-            obj.put("dock_band", false);
-            obj.put("dock_opacity", 40);
-            obj.put("dock_even_padding", true);
+            obj.put("dock_opacity", "sweden".equals(key) ? 50 : 40);
             obj.put("icon_only_buttons", true);
             obj.put("icon_only_inputs", true);
-            obj.put("ambient_glow", false);
-            obj.put("app_glow", false);
-            obj.put("fade_rows", true);
-            obj.put("focus_overshoot", false);
             obj.put("advanced_effects", true);
-            obj.put("header_white", true);
+            obj.put("fade_rows", true);
             obj.put("glass_style", "frosted");
         } else if ("retro".equals(key)) {
             obj.put("columns", 5);
-            obj.put("rows_below_dock", 0);
             obj.put("background_color", "#000000");
-            obj.put("wallpaper", false);
-            obj.put("dock_glass", false);
-            obj.put("dock_band", false);
             obj.put("glass_style", "rim");
-            obj.put("dock_title", false);
-            obj.put("dock_opacity", 100);
-            obj.put("fill_dock", true);
-            obj.put("ambient_glow", false);
-            obj.put("app_glow", false);
             obj.put("icon_only_buttons", true);
             obj.put("icon_only_inputs", true);
             obj.put("wifi_status_color", true);
             obj.put("tile_menu", true);
             obj.put("reduced_motion", true);
             obj.put("sky_intensity", 0);
-            obj.put("cinematic_home", false);
-            obj.put("header_white", true);
         } else if ("ruska".equals(key)) {
-            obj.put("columns", 4);
-            obj.put("rows_below_dock", 0);
             obj.put("background_color", "#07080D");
             obj.put("wallpaper", true);
-            obj.put("ambient_glow", false);
             obj.put("dock_opacity", 70);
-            obj.put("dock_glass", false);
             obj.put("dock_band", true);
             obj.put("app_glow", true);
-            obj.put("focus_overshoot", false);
-            obj.put("header_white", true);
-            obj.put("cinematic_home", false);
             obj.put("glass_style", "frosted");
         } else if ("aurora".equals(key)) {
-            obj.put("columns", 4);
-            obj.put("rows_below_dock", 0);
             obj.put("background_color", "#070A14");
             obj.put("wallpaper", true);
             obj.put("dock_glass", true);
             obj.put("dock_band", true);
-            obj.put("dock_opacity", 100);
             obj.put("app_glow", true);
             obj.put("glow_style", "horizon");
             obj.put("sky_intensity", 45);
-            obj.put("header_white", true);
-            obj.put("cinematic_home", false);
-            obj.put("glass_style", "frosted");
-        } else if ("sweden".equals(key)) {
-            obj.put("columns", 6);
-            obj.put("rows_below_dock", 1);
-            obj.put("background_color", "#05070C");
-            obj.put("wallpaper", true);
-            obj.put("cinematic_home", false);
-            obj.put("dock_title", false);
-            obj.put("dock_glass", true);
-            obj.put("dock_band", false);
-            obj.put("dock_opacity", 50);
-            obj.put("dock_even_padding", true);
-            obj.put("icon_only_buttons", true);
-            obj.put("icon_only_inputs", true);
-            obj.put("ambient_glow", false);
-            obj.put("app_glow", false);
-            obj.put("fade_rows", true);
-            obj.put("focus_overshoot", false);
-            obj.put("advanced_effects", true);
-            obj.put("header_white", true);
             obj.put("glass_style", "frosted");
         } else if ("six_columns".equals(key)) {
             obj.put("columns", 6);
             obj.put("rows_below_dock", 1);
             obj.put("background_color", "#000000");
-            obj.put("wallpaper", false);
-            obj.put("dock_glass", false);
             obj.put("dock_band", true);
-            obj.put("dock_opacity", 100);
-            obj.put("header_white", true);
-            obj.put("cinematic_home", false);
         } else if ("dussehra".equals(key)) {
-            obj.put("columns", 4);
-            obj.put("rows_below_dock", 0);
             obj.put("festival", "dussehra");
             obj.put("accent_color", "#FFB23C");
             obj.put("background_color", "#120809");
             obj.put("wallpaper", true);
             obj.put("dock_glass", true);
-            obj.put("header_white", true);
-            obj.put("cinematic_home", false);
         } else if ("scenes".equals(key)) {
-            obj.put("columns", 4);
-            obj.put("rows_below_dock", 0);
             obj.put("background_color", "#0A0E1A");
             obj.put("wallpaper", true);
             obj.put("dock_glass", true);
-            obj.put("header_white", true);
-            obj.put("cinematic_home", false);
-        } else if ("dark".equals(key)) {
-            obj.put("columns", 4);
-            obj.put("rows_below_dock", 0);
-            obj.put("background_color", "#12141A");
-            obj.put("wallpaper", false);
-            obj.put("dock_glass", false);
-            obj.put("dock_band", false);
+        } else if ("dark".equals(key) || "night".equals(key)) {
+            obj.put("background_color", "dark".equals(key) ? "#12141A" : "#000000");
             obj.put("glass_style", "flat");
             obj.put("app_glow", true);
             obj.put("glow_style", "horizon");
-            obj.put("header_white", true);
-            obj.put("cinematic_home", false);
         } else if ("light".equals(key)) {
-            obj.put("columns", 4);
-            obj.put("rows_below_dock", 0);
             obj.put("background_color", "#F0F3F8");
-            obj.put("wallpaper", false);
             obj.put("header_white", false);
             obj.put("dock_glass", true);
-            obj.put("dock_band", false);
             obj.put("glass_style", "light");
             obj.put("app_glow", false);
-            obj.put("cinematic_home", false);
-        } else if ("night".equals(key)) {
-            obj.put("columns", 4);
-            obj.put("rows_below_dock", 0);
-            obj.put("background_color", "#000000");
-            obj.put("wallpaper", false);
-            obj.put("dock_glass", false);
-            obj.put("dock_band", false);
-            obj.put("glass_style", "flat");
-            obj.put("app_glow", true);
-            obj.put("glow_style", "horizon");
-            obj.put("header_white", true);
-            obj.put("cinematic_home", false);
         } else if ("default".equals(key)) {
-            obj.put("columns", 4);
-            obj.put("rows_below_dock", 0);
             obj.put("background_color", "#000000");
-            obj.put("wallpaper", false);
-            obj.put("dock_glass", false);
             obj.put("dock_band", true);
-            obj.put("dock_opacity", 100);
-            obj.put("header_white", true);
-            obj.put("cinematic_home", false);
         } else { // "glass"
             obj.put("columns", 5);
-            obj.put("rows_below_dock", 0);
             obj.put("background_color", "#090C14");
             obj.put("wallpaper", true);
-            obj.put("cinematic_home", false);
             obj.put("dock_glass", true);
             obj.put("dock_band", true);
-            obj.put("dock_opacity", 100);
             obj.put("dock_even_padding", true);
             obj.put("icon_only_buttons", true);
             obj.put("app_glow", true);
             obj.put("glow_style", "horizon");
-            obj.put("focus_overshoot", false);
             obj.put("advanced_effects", true);
             obj.put("fade_rows", true);
-            obj.put("header_white", true);
             obj.put("glass_style", "frosted");
         }
         return obj;
